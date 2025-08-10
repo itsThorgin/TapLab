@@ -66,7 +66,7 @@ Open the **⚙ Settings** panel:
 - False target on/off + probability (0-1, step 0.05)
 
 **Peripheral Awareness**  
-- Rounds (3-50)  
+- Rounds (3-10)  
 - True target size (3/6/9 px)  
 - Distractor count (6-30)  
 - **Same color mode** (true target blinks)

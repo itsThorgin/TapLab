@@ -308,36 +308,44 @@ window.quadrantBlink = {
 
     const rows = results.times.map((t,i) => {
       const L = results.labels[i];
-      const tdisp = Number.isFinite(t) ? `${t} ms` : '-';
+      const tdisp = Number.isFinite(t) ? `${t} ms` : '<strong>- - -</strong>';
       const color = (L==='correct') ? '#2ec4b6' : (L==='wrong' ? '#ffb300' : '#f44336');
-      return `<tr>
-        <td>${i+1}</td>
-        <td style="text-align:right; padding-left:20px; color:${color};">${tdisp} <small>(${L})</small></td>
-      </tr>`;
+      return `
+        <tr>
+          <td>${i+1}</td>
+          <td style="color:${color};">${tdisp}</td>
+          <td>${L}</td>
+        </tr>
+      `;
     }).join('');
 
     container.innerHTML = `
-      <div style="text-align:center; margin-top:20px; max-width:780px; margin:auto; color:#e0e1dd;">
-        <h2>Quadrant Blink</h2>
-        <div style="margin:8px 0;">
-          <span>Avg Reaction Time (correct only): <strong>${results.average ?? '-'}</strong>${results.average?' ms':''}</span><br>
+      <div style="max-width:95%; margin:auto; color:#e0e1dd;">
+        <h2 style="text-align:center;">Quadrant Blink Results</h2>
+        <div style="margin:8px 0; text-align:center;">
+          <span>Avg Reaction Time (correct only): <strong>${results.average ?? '-'}</strong>${results.average ? ' ms' : ''}</span><br>
           <span>Missed intervals: <strong>${results.missedIntervals}</strong></span> ·
           <span>Wrong clicks: <strong>${results.wrongClicks}</strong></span><br>
           <span>Speed: <strong>${results.blinkIntervalMs} ms</strong> · Intervals: <strong>${results.intervalsCount}</strong></span>
         </div>
 
-        <div style="margin:8px 0; font-size:0.9em; color:#ccc; text-align:left; max-width:600px; margin:auto;">
+        <div style="font-size:0.9em; color:#ccc; text-align:left; max-width:600px; margin:auto;">
           <strong>Legend:</strong><br><br>
           • <span style="color:#2ec4b6;">Correct</span> - Clicked the lit quadrant during its highlight.<br>
           • <span style="color:#ffb300;">Wrong</span> - Clicked a different quadrant while one was lit.<br>
           • <span style="color:#f44336;">Missed</span> - No clicks before the highlight ended.<br><br>
         </div>
 
-        <table style="margin:0 auto;border-collapse:collapse;color:white;">
-          ${rows}
-        </table>
+        <div style="max-height:300px; overflow-y:auto;">
+          <table class="results-table">
+            <tr>
+              <th>#</th><th>Reaction Time</th><th>Label</th>
+            </tr>
+            ${rows}
+          </table>
+        </div>
 
-        <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
+        <div style="text-align:center; margin-top:14px;">
           <button onclick="window.quadrantBlink.startGame()">Restart</button>
           <button onclick="returnToMenu()">Back to Menu</button>
         </div>
@@ -401,4 +409,5 @@ window.quadrantBlink = {
     container.classList.add('hidden');
     returnToMenu();
   }
+
 };

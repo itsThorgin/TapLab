@@ -459,26 +459,47 @@ window.peripheral = {
   showResultsOverlay(results) {
     const container = document.getElementById('game-container');
 
-    const rows = results.times.map((t,i) => {
-      const miss = results.mistakes[i];
-      const tdisp = Number.isFinite(t) ? `${t} ms` : '-';
-      const mark = miss ? '<span style="color:orange; margin-left:6px;">●</span>' : '';
-      return `<tr><td>Round ${i+1}</td><td style="text-align:right; padding-left:20px;">${tdisp}${mark}</td></tr>`;
+    // builds labels from mistakes and times
+    const labels = results.times.map((t, i) => {
+      if (results.mistakes[i]) return 'wrong';
+      if (!Number.isFinite(t)) return 'missed';
+      return 'correct';
+    });
+  
+    const rows = results.times.map((t, i) => {
+      const L = labels[i];
+      const tdisp = Number.isFinite(t) ? `${t} ms` : '<strong>- - -</strong>';
+      const color =
+        L === 'correct' ? '#2ec4b6' :
+        L === 'wrong'   ? '#ffb300' :
+                          '#f44336';
+      return `
+        <tr>
+          <td>${i + 1}</td>
+          <td style="color:${color};">${tdisp}</td>
+          <td>${L}</td>
+        </tr>
+      `;
     }).join('');
-
+  
     container.innerHTML = `
-      <div style="text-align:center; margin-top:20px; max-width:720px ;margin:auto; color:#e0e1dd;">
-        <h2>Peripheral Awareness</h2>
-        <div style="margin:8px 0;">
-          <span>Average (correct only): <strong>${results.average ?? '-'}</strong> ${results.average? 'ms':''}</span><br>
+      <div style="max-width:95%; margin:auto; color:#e0e1dd;">
+        <h2 style="text-align:center;">Peripheral Awareness Results</h2>
+        <div style="margin:8px 0; text-align:center;">
+          <span>Avg Reaction Time (correct only): <strong>${results.average ?? '-'}</strong>${results.average ? ' ms' : ''}</span><br>
           <span>Mistakes: <strong>${results.mistakesTotal}</strong></span>
         </div>
 
-        <table style="margin:0 auto; border-collapse:collapse; color:white;">
-          ${rows}
-        </table>
+        <div style="max-height:300px; overflow-y:auto;">
+          <table class="results-table">
+            <tr>
+              <th>#</th><th>Reaction Time</th><th>Label</th>
+            </tr>
+            ${rows}
+          </table>
+        </div>
 
-        <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
+        <div style="text-align:center; margin-top:14px;">
           <button onclick="window.peripheral.startGame()">Restart</button>
           <button onclick="returnToMenu()">Back to Menu</button>
         </div>
@@ -557,3 +578,4 @@ window.peripheral = {
   }
 
 };
+

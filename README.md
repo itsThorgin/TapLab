@@ -72,26 +72,14 @@ Open the **⚙ Settings** panel:
 - **Same color mode** (true target blinks)
 
 **Quadrant Blink**  
-- Intervals count (10–200)  
-- Blink speed (100–1500 ms, step 25)
+- Intervals count (10-200)  
+- Blink speed (100-1500 ms, step 25)
 
 **Reset buttons**  
 - **Reset This Level’s Scores** - clears that drill’s history/scores.  
 - **Reset All Scores & Settings** - scorched earth (localStorage wipe).
 
 ---
-
-## How it measures stuff (plain English)
-
-- **Reaction Test**: time from *blue-green paint* to your click. False/too soon flags shown.  
-- **Pop-up Targets**:  
-  - *Hover* = spawn→first time mouse enters target  
-  - *Click delay* = hover→click  
-  - *Total* = spawn→click  
-  - Misses/false hits per target saved  
-  - False target lifetime adapts to your past averages (capped at 2s).  
-- **Peripheral**: ms from spawn→your quadrant click. Mistake = wrong quadrant (no RT).  
-- **Quadrant Blink**: if you click the right quadrant during its highlight window, that interval gets an RT; else it’s **missed**. Wrong quadrant = **wrong**.
 
 All data is kept **locally** via `localStorage`.
 

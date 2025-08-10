@@ -42,7 +42,7 @@ window.peripheral = {
     const panel = document.getElementById('level-specific-settings');
     panel.innerHTML = `
       <label>Rounds:
-        <input type="number" id="periph-rounds" min="3" max="50" value="${this.rounds}">
+        <input type="number" id="periph-rounds" min="3" max="10" value="${this.rounds}">
       </label><br><br>
       <label>True target size:
         <select id="periph-size">
@@ -69,7 +69,7 @@ window.peripheral = {
     const distractorCount = parseInt(document.getElementById('periph-distractors').value);
     const uniformColor = document.getElementById('periph-uniform').checked;
 
-    this.rounds = Math.min(50, Math.max(3, rounds || 10));
+    this.rounds = Math.min(10, Math.max(3, rounds || 10));
     this.trueTargetSize = [3,6,9].includes(trueTargetSize) ? trueTargetSize : 6;
     this.distractorCount = Math.min(30, Math.max(6, distractorCount || 12));
     this.uniformColor = uniformColor;
@@ -555,4 +555,5 @@ window.peripheral = {
     container.classList.add('hidden');
     returnToMenu();
   }
+
 };

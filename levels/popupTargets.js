@@ -396,10 +396,19 @@ window.popupTargets = {
                 <p>Average total: ${results.avgTotal} ms</p>
                 <p>Total session time: ${(results.totalSessionTime/1000).toFixed(2)} s</p>
 
-                <table class="results-table" style="margin:0 auto;max-width:600px;">
-                    <tr><th>#</th><th>Hover(ms)</th><th>Click delay(ms)</th><th>Total(ms)</th><th>Misses</th><th>False Hits</th></tr>
-                    ${rows}
-                </table>
+                <div style="max-height:60vh; overflow-y:auto; margin-top:10px; border:1px solid #555; border-radius:6px;">
+                    <table class="results-table" style="margin:0 auto;max-width:600px; width:100%;">
+                        <tr>
+                            <th>#</th>
+                            <th>Hover(ms)</th>
+                            <th>Click delay(ms)</th>
+                            <th>Total(ms)</th>
+                            <th>Misses</th>
+                            <th>False Hits</th>
+                        </tr>
+                        ${rows}
+                    </table>
+                </div>
 
                 <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
                     <button onclick="window.popupTargets.startGame()">Restart</button>
@@ -470,4 +479,5 @@ window.popupTargets = {
         container.classList.add('hidden');
         returnToMenu();
     }
+
 };

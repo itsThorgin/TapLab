@@ -1,6 +1,6 @@
 # TapLab
 
-**TapLab** is a fast, browser-based reflex trainer for FPS enjoyers, try-hards, and “why did that not register?” philosophers. Four bite-sized drills, zero installs, lots of timing stats, and a healthy pinch of sarcasm.
+**TapLab** is a fast, browser based reflex trainer for FPS enjoyers, tryhards, and “why did that not register?” philosophers. Four little drills, zero installs, lots of timing stats, and a healthy pinch of sarcasm.
 
 > TL;DR: Open link, pick level, hit start, get humbled in milliseconds.
 
@@ -10,8 +10,7 @@
 
 Because sometimes you don’t need a full aim trainer with 400 toggles - you just need a few sharp drills that measure:  
 - how fast you **react**,  
-- how fast you **get there**,  
-- whether you **clicked the wrong shiny thing**, and  
+- how fast you **get there**,   
 - how often your **eyes lied** to you.
 
 Also because I wanted to press buttons and see numbers go brr.
@@ -26,21 +25,21 @@ Click the rectangle the moment it turns **blue-green**.
 - Optional *False Start Trick* (random orange bait).  
 - Built-in **benchmarks** after your run:  
   - *On The Top* - ≤ 130 ms (exceptional; F1 / pro esports best runs)  
-  - *Elite* - 131–150 ms  
-  - *High Ranked* - 151–180 ms  
-  - *Experienced* - 181–199 ms  
-  - *Average* - 200–260 ms  
+  - *Elite* - 131-150 ms  
+  - *High Ranked* - 151-180 ms  
+  - *Experienced* - 181-199 ms  
+  - *Average* - 200-260 ms  
   - *Below Average* - > 260 ms
 
 ### 2) Pop-up Targets
-Targets spawn one-by-one in a 16:9 arena. Hover over, then click it - as fast as possible.  
+Targets spawn one by one. Hover over, then click it - as fast as possible.  
 - Tracks: **Hover time** (to get on target), **Click delay** (hover to click), **Total time**, **Misses**, **False hits**.  
 - Optional **False Target** in orange color with adjustable chance. Clicking it doesn’t count. It just judges you.
 
 ### 3) Peripheral Awareness
 Keep your eyes on the **center dot**. A tiny real target spawns in random **quadrants** among big distractor dots. Click the quadrant (UL/UR/LL/LR) - **do not chase it with your eyes**.  
 - Tracks: reaction time from spawn to click, mistakes per round, average on correct trials.  
-- Bonus mode: **Same color** - distractors match the target color, the true tiny target **blinks 3×** to be just barely fair.
+- Bonus mode: **Same color** - distractors match the target color, the true tiny target **blinks 3x**.
 
 ### 4) Quadrant Blink
 Every *xx* ms, one quadrant lights up briefly. Click the highlighted quadrant **during** that window.  
@@ -58,18 +57,18 @@ Every *xx* ms, one quadrant lights up briefly. Click the highlighted quadrant **
 Open the **⚙ Settings** panel:
 
 **Reaction Test**  
-- Rounds (3–10)  
+- Rounds (3-10)  
 - *False Start Trick* on/off
 
 **Pop-up Targets**  
-- Number of targets (1–50)  
-- Target size (5–25 px)  
-- False target on/off + probability (0–1, step 0.05)
+- Number of targets (1-50)  
+- Target size (5-25 px)  
+- False target on/off + probability (0-1, step 0.05)
 
 **Peripheral Awareness**  
-- Rounds (3–50)  
+- Rounds (3-50)  
 - True target size (3/6/9 px)  
-- Distractor count (6–30)  
+- Distractor count (6-30)  
 - **Same color mode** (true target blinks)
 
 **Quadrant Blink**  
@@ -94,7 +93,7 @@ Open the **⚙ Settings** panel:
 - **Peripheral**: ms from spawn→your quadrant click. Mistake = wrong quadrant (no RT).  
 - **Quadrant Blink**: if you click the right quadrant during its highlight window, that interval gets an RT; else it’s **missed**. Wrong quadrant = **wrong**.
 
-All data is kept **locally** via `localStorage`. No servers, no analytics, no cloud, no judgement (lie).
+All data is kept **locally** via `localStorage`.
 
 ---
 

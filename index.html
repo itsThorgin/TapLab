@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>TapLab</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Settings Button -->
+    <button id="settings-btn" title="Settings">⚙</button>
+
+    <!-- Settings Panel -->
+    <div id="settings-panel" class="hidden">
+        <h2>Settings</h2>
+        <div id="level-specific-settings"></div>
+        <button class="reset-btn" id="reset-level">Reset This Level's Scores</button>
+        <button class="reset-btn" id="reset-global">Reset All Scores & Settings</button>
+        <button id="close-settings">Close</button>
+        <h6>Made with not so much ❤️ by Thorgin &copy; 2025</h6>
+    </div>
+
+    <!-- Main Menu -->
+    <div id="menu">
+        <h1>TapLab - reflex trainer 9000</h1>
+        <h5>Made with not so much ❤️ by Thorgin &copy; 2025</h5>
+        <button class="menu-btn" onclick="startLevel('reaction')">Reaction Test</button>
+        <button class="menu-btn" onclick="startLevel('popupTargets')">Pop-up Targets</button>
+        <button class="menu-btn" onclick="startLevel('peripheral')">Peripheral Awareness</button>
+        <button class="menu-btn" onclick="startLevel('quadrantBlink')">Quadrant Blink</button>
+    </div>
+
+    <!-- Game Container -->
+    <div id="game-container" class="hidden"></div>
+    <!-- Results Screen -->
+    <div id="results" class="hidden">
+        <h2>Results</h2>
+        <div id="results-content"></div>
+        <button onclick="returnToMenu()">Back to Menu</button>
+    </div>
+
+    <script src="main.js"></script>
+    <script src="levels/reaction.js"></script>
+    <script src="levels/popupTargets.js"></script>
+    <script src="levels/peripheral.js"></script>
+    <script src="levels/quadrantBlink.js"></script>
+</body>
+</html>

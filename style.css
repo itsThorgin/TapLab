@@ -1,0 +1,178 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #0d1b2a;
+    color: #e0e1dd;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    overflow: hidden;
+}
+
+h1, h2 {
+    color: #f4a261;
+}
+
+#menu h1, h5 {
+    text-align: center;
+    width: 100%;
+}
+
+.menu-btn, button {
+    background-color: #1b263b;
+    color: #e0e1dd;
+    border: none;
+    padding: 10px 20px;
+    margin: 5px;
+    cursor: pointer;
+    border-radius: 8px;
+    font-size: 1em;
+    transition: background-color 0.3s;
+}
+
+.menu-btn:hover, button:hover {
+    background-color: #2ec4b6;
+}
+
+#settings-btn {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: #1b263b;
+    font-size: 1.5em;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+    padding: 0;
+    z-index: 10000;
+}
+
+#settings-btn:hover {
+    background-color: #2ec4b6;
+}
+
+#settings-panel {
+    position: fixed;
+    top: 50px;
+    right: 10px;
+    background-color: #1b263b;
+    padding: 15px;
+    border-radius: 8px;
+    width: 250px;
+    box-shadow: 0 0 10px #000;
+    z-index: 10001;
+}
+
+#settings-panel h6 {
+    text-align: center;
+}
+
+.hidden {
+    display: none;
+}
+
+.reset-btn {
+    background-color: #e63946;
+    color: white;
+    margin-top: 10px;
+}
+
+#game-container {
+    width: 100%;
+    height: calc(100vh - 60px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* general style for results/history */
+.results-table {
+    border-collapse: separate;
+    border-spacing: 8px;
+    width: 100%;
+    color: white;
+    text-align: center;
+}
+
+.results-table th, .results-table td {
+    padding: 8px 12px;
+    border-radius: 4px;
+}
+
+.results-table th {
+    background-color: #1b263b;
+    color: #f4a261;
+}
+
+.results-table tr:nth-child(even) td {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+.results-table tr:nth-child(odd) td {
+    background-color: rgba(255, 255, 255, 0.02);
+}
+
+/* two column layout */
+.results-layout{
+  display:flex;
+  justify-content:center;
+  align-items:stretch;
+  gap:28px;
+  flex-wrap:wrap;
+  margin-top:16px;
+}
+
+/* columns */
+.column-left,.column-right{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  gap:10px;
+}
+
+/* divider */
+.column-separator{
+  width:1px;
+  background:rgba(255,255,255,.18);
+  align-self:stretch;
+  border-radius:1px;
+}
+
+/* stacked badges on the left */
+.badge-stack{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  align-items:center;
+}
+
+/* small benchmark badges */
+.tier-badge{
+  width:160px;
+  padding:6px 10px;
+  border-radius:10px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  color:#002;
+  font-size:.9em;
+}
+.tier-badge small{opacity:.9;font-weight:600}
+
+/* current result badge on the right - can grow */
+.current-result-badge{
+  padding:8px 14px;
+  border-radius:10px;
+  display:inline-flex;
+  flex-direction:column;
+  align-items:center;
+  text-align:center;
+  color:#002;
+  font-size:.95em;
+  max-width:min(92vw, 440px);
+}

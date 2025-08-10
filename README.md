@@ -72,7 +72,7 @@ Open the **⚙ Settings** panel:
 - **Same color mode** (true target blinks)
 
 **Quadrant Blink**  
-- Intervals count (10-200)  
+- Highlights count (10-200)  
 - Blink speed (100-1500 ms, step 25)
 
 **Reset buttons**  

@@ -217,9 +217,12 @@ window.quadrantBlink = {
       if (el) el.style.opacity = (k === this.activeQuadrant) ? '0.35' : '0';
     });
 
-    // start timing and accept clicks
-    this.intervalStart = performance.now();
-    this.roundReady = true;
+    // start timing and accept clicks and sync the timing with paint
+    requestAnimationFrame(() => {
+      this.intervalStart = performance.now();
+      this.roundReady = true;
+    });
+    
     // ensure a slot exists for this interval in arrays
     this.times[this.currentIndex] = null;
     this.labels[this.currentIndex] = 'missed'; // default - overwritten on correct click
@@ -411,3 +414,4 @@ window.quadrantBlink = {
   }
 
 };
+

@@ -272,6 +272,38 @@ window.quadrantBlink = {
     this.roundReady = false;
   },
 
+  // evaluation for next speed progression
+  evaluateProgress(results) {
+    const correctCount = results.labels.filter(l => l === 'correct').length;
+    const accuracy = correctCount / results.intervalsCount;
+    const neededCorrect = Math.floor(results.intervalsCount * 0.75);
+
+    const nextSpeed = Math.max(100, results.blinkIntervalMs - 25);
+
+    const avgFastEnough = results.average !== null && results.average <= nextSpeed;
+
+    const fastEnoughCount = results.times.filter(
+      (t, i) => results.labels[i] === 'correct' && t !== null && t <= nextSpeed
+    ).length;
+    const consistency = correctCount ? (fastEnoughCount / correctCount) : 0;
+
+    const qualifies = (
+      correctCount >= neededCorrect &&
+      avgFastEnough &&
+      consistency >= 0.5
+    );
+
+    return {
+      accuracy: Math.round(accuracy * 100),
+      neededCorrect,
+      correctCount,
+      nextSpeed,
+      avgFastEnough,
+      consistency: Math.round(consistency * 100),
+      qualifies
+    };
+  },
+  
   finish() {
     this.gameActive = false;
 
@@ -289,7 +321,9 @@ window.quadrantBlink = {
       _customOverlay: true
     };
 
-    this.showResultsOverlay(results);
+    const progress = this.evaluateProgress(results);
+    
+    this.showResultsOverlay(results, progress);
     this.endCallback(results);
 
     // history
@@ -301,12 +335,13 @@ window.quadrantBlink = {
       average: avg,
       wrongClicks: this.wrongClicks,
       missedIntervals: this.missedIntervals,
-      times: this.times
+      times: this.times,
+      progress: progress
     });
     localStorage.setItem('quadrantBlink_history', JSON.stringify(history));
   },
 
-  showResultsOverlay(results) {
+  showResultsOverlay(results, progress) {
     const container = document.getElementById('game-container');
 
     const rows = results.times.map((t,i) => {
@@ -330,6 +365,20 @@ window.quadrantBlink = {
           <span>Missed intervals: <strong>${results.missedIntervals}</strong></span> ·
           <span>Wrong clicks: <strong>${results.wrongClicks}</strong></span><br>
           <span>Speed: <strong>${results.blinkIntervalMs} ms</strong> · Intervals: <strong>${results.intervalsCount}</strong></span>
+        </div>
+
+        <div style="margin:8px 0; text-align:center; padding-top:6px; font-size:0.9em;">
+          <div>Accuracy: <strong>${progress.accuracy}% </strong> ${progress.correctCount >= progress.neededCorrect ? '✓' : '✗'}
+            (${progress.correctCount} / ${results.intervalsCount}, need ${progress.neededCorrect} for <strong>75%</strong>)</div>
+          <div>Average RT vs next level (${progress.nextSpeed} ms): 
+            <strong>${results.average ?? '-'}</strong> ms ${progress.avgFastEnough ? '✓' : '✗'}</div>
+          <div>Consistency: <strong>${progress.consistency}%</strong> ${progress.consistency >= 50 ? '✓' : '✗'}
+            (need ≥ 50% correct at next speed)</div>
+          <div>Next level readiness: 
+            <strong style="color:${progress.qualifies ? '#2ec4b6' : '#f44336'};">
+              ${progress.qualifies ? 'YES' : 'NO'}
+            </strong>
+          </div>
         </div>
 
         <div style="font-size:0.9em; color:#ccc; text-align:left; max-width:600px; margin:auto;">
@@ -371,16 +420,21 @@ window.quadrantBlink = {
       return;
     }
 
-    const rows = history.map((h,i) => `
-      <tr>
-        <td>${i+1}</td>
-        <td>${h.date}</td>
-        <td>${h.intervalsCount} @ ${h.blinkIntervalMs}ms</td>
-        <td>${h.average ?? '-'}</td>
-        <td>${h.missedIntervals}</td>
-        <td>${h.wrongClicks}</td>
-      </tr>
-    `).join('');
+    const rows = history.map((h,i) => {
+      const prog = h.progress || {};
+      return `
+        <tr>
+          <td>${i+1}</td>
+          <td>${h.date}</td>
+          <td>${h.intervalsCount} @ ${h.blinkIntervalMs}ms</td>
+          <td>${h.average ?? '-'}</td>
+          <td>${h.missedIntervals}</td>
+          <td>${h.wrongClicks}</td>
+          <td>${prog.accuracy !== undefined ? prog.accuracy + '%' : '-'}</td>
+          <td>${prog.qualifies !== undefined ? (prog.qualifies ? 'YES' : 'NO') : '-'}</td>
+        </tr>
+      `;
+    }).join('');
 
     container.innerHTML = `
       <div style="max-width:95%; margin:auto; color:#e0e1dd;">
@@ -388,7 +442,7 @@ window.quadrantBlink = {
         <div style="max-height:70vh; overflow-y:auto;">
           <table class="results-table">
             <tr>
-              <th>#</th><th>Date</th><th>Config</th><th>Average</th><th>Missed</th><th>Wrong</th>
+              <th>#</th><th>Date</th><th>Config</th><th>Average</th><th>Missed</th><th>Wrong</th><th>Accuracy %</th><th>Ready Next?</th>
             </tr>
             ${rows}
           </table>
@@ -414,4 +468,5 @@ window.quadrantBlink = {
   }
 
 };
+
 

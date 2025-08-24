@@ -75,7 +75,8 @@ window.quadrantBlink = {
       intervalsCount: this.intervalsCount,
       blinkIntervalMs: this.blinkIntervalMs
     }));
-    alert('Settings saved.');
+    this.showPopupMessage("Settings saved.");
+    this.showInstruction();
   },
 
   showInstruction() {
@@ -280,13 +281,15 @@ window.quadrantBlink = {
 
     const nextSpeed = Math.max(100, results.blinkIntervalMs - 25);
 
-    const avgFastEnough = results.average !== null && results.average <= nextSpeed;
+    let consistency = 0;
 
-    const fastEnoughCount = results.times.filter(
-      (t, i) => results.labels[i] === 'correct' && t !== null && t <= nextSpeed
-    ).length;
-    const consistency = correctCount ? (fastEnoughCount / correctCount) : 0;
-
+    if (correctCount >= neededCorrect) {
+      const fastEnoughCount = results.times.filter(
+        (t, i) => results.labels[i] === 'correct' && t !== null && t <= nextSpeed
+      ).length;
+      const consistency = correctCount ? (fastEnoughCount / correctCount) : 0;
+    }
+      
     const qualifies = (
       correctCount >= neededCorrect &&
       avgFastEnough &&
@@ -298,7 +301,6 @@ window.quadrantBlink = {
       neededCorrect,
       correctCount,
       nextSpeed,
-      avgFastEnough,
       consistency: Math.round(consistency * 100),
       qualifies
     };
@@ -370,8 +372,6 @@ window.quadrantBlink = {
         <div style="margin:8px 0; text-align:center; padding-top:6px; font-size:0.9em;">
           <div>Accuracy: <strong>${progress.accuracy}% </strong> ${progress.correctCount >= progress.neededCorrect ? '✓' : '✗'}
             (${progress.correctCount} / ${results.intervalsCount}, need ${progress.neededCorrect} for <strong>75%</strong>)</div>
-          <div>Average RT vs next level (${progress.nextSpeed} ms): 
-            <strong>${results.average ?? '-'}</strong> ms ${progress.avgFastEnough ? '✓' : '✗'}</div>
           <div>Consistency: <strong>${progress.consistency}%</strong> ${progress.consistency >= 50 ? '✓' : '✗'}
             (need ≥ 50% correct at next speed)</div>
           <div>Next level readiness: 
@@ -405,6 +405,18 @@ window.quadrantBlink = {
     `;
   },
 
+  showPopupMessage: function(text) {
+        const panel = document.getElementById('settings-panel');
+        const msg = document.createElement('div');
+        msg.textContent = text;
+        msg.style.cssText = `
+            background:#2ec4b6; color:#002; padding:6px 10px;
+            border-radius:6px; margin-top:8px; font-size:0.9em;
+        `;
+        panel.appendChild(msg);
+        setTimeout(()=>msg.remove(), 1500);
+    },
+  
   showHistory() {
     const history = JSON.parse(localStorage.getItem('quadrantBlink_history') || '[]');
     const container = document.getElementById('game-container');
@@ -468,5 +480,6 @@ window.quadrantBlink = {
   }
 
 };
+
 
 

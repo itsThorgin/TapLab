@@ -80,7 +80,8 @@ window.peripheral = {
       distractorCount: this.distractorCount,
       uniformColor: this.uniformColor
     }));
-    alert('Settings saved.');
+    this.showPopupMessage("Settings saved.");
+    this.showInstruction();
   },
 
   showInstruction() {
@@ -551,6 +552,18 @@ window.peripheral = {
     `;
   },
 
+  showPopupMessage: function(text) {
+        const panel = document.getElementById('settings-panel');
+        const msg = document.createElement('div');
+        msg.textContent = text;
+        msg.style.cssText = `
+            background:#2ec4b6; color:#002; padding:6px 10px;
+            border-radius:6px; margin-top:8px; font-size:0.9em;
+        `;
+        panel.appendChild(msg);
+        setTimeout(()=>msg.remove(), 1500);
+    },
+  
   showTemporaryMessage(text, color = "#ff4d4d") {
     const host = document.getElementById('game-container');
     if (!host) return;
@@ -578,4 +591,5 @@ window.peripheral = {
   }
 
 };
+
 

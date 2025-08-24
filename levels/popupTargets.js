@@ -125,6 +125,7 @@ window.popupTargets = {
         this.falseTargetEnabled = falseTarget;
         this.falseTargetChance = falseChance;
         this.showPopupMessage("Settings saved.");
+        this.showInstruction();
     },
 
     showInstruction: function() {
@@ -481,3 +482,4 @@ window.popupTargets = {
     }
 
 };
+

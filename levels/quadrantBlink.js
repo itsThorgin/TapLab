@@ -292,7 +292,6 @@ window.quadrantBlink = {
       
     const qualifies = (
       correctCount >= neededCorrect &&
-      avgFastEnough &&
       consistency >= 0.5
     );
 
@@ -480,6 +479,7 @@ window.quadrantBlink = {
   }
 
 };
+
 
 
 

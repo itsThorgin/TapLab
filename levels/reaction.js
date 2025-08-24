@@ -49,9 +49,10 @@ window.reaction = {
         const rounds = parseInt(document.getElementById('reaction-rounds').value);
         const falseStart = document.getElementById('reaction-false-start').checked;
         localStorage.setItem('reaction_settings', JSON.stringify({ rounds, falseStart }));
-        alert("Settings saved.");
+        this.showPopupMessage("Settings saved.");
         this.rounds = rounds;
         this.falseStartEnabled = falseStart;
+        this.showInstruction();
     },
 
     showInstruction: function() {
@@ -267,6 +268,18 @@ window.reaction = {
         localStorage.setItem('reaction_history', JSON.stringify(history));
     },
 
+    showPopupMessage: function(text) {
+        const panel = document.getElementById('settings-panel');
+        const msg = document.createElement('div');
+        msg.textContent = text;
+        msg.style.cssText = `
+            background:#2ec4b6; color:#002; padding:6px 10px;
+            border-radius:6px; margin-top:8px; font-size:0.9em;
+        `;
+        panel.appendChild(msg);
+        setTimeout(()=>msg.remove(), 1500);
+    },
+    
     showTemporaryMessage: function(text, color = "#ff4d4d") {
         const box = document.getElementById('reaction-box');
         if (!box) return;  // safe check
@@ -449,4 +462,5 @@ window.reaction = {
         this.timeoutIds.forEach(id => clearTimeout(id));
         this.timeoutIds = [];
     }
+
 };

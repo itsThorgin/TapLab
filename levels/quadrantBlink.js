@@ -143,14 +143,6 @@ window.quadrantBlink = {
     vLine.style.cssText = `position:absolute; top:0; left:50%; height:100%; width:2px; background:rgba(255,255,255,0.35); transform:translateX(-1px);`;
     area.appendChild(hLine); area.appendChild(vLine);
 
-    // Center dot
-    const centerDot = document.createElement('div');
-    centerDot.style.cssText = `
-      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
-      width:8px; height:8px; border-radius:50%; background:#e0e1dd; box-shadow:0 0 4px rgba(0,0,0,0.4);
-    `;
-    area.appendChild(centerDot);
-
     // Quadrant click surface
     const quads = [
       { key: 'UL', left: 0,   top: 0 },
@@ -202,6 +194,14 @@ window.quadrantBlink = {
       }
       area.appendChild(overlay);
     });
+
+    // Center dot
+    const centerDot = document.createElement('div');
+    centerDot.style.cssText = `
+      position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
+      width:8px; height:8px; border-radius:50%; background:#e0e1dd; box-shadow:0 0 4px rgba(0,0,0,0.4);
+    `;
+    area.appendChild(centerDot);
   },
 
   beginCadence(area) {
@@ -514,3 +514,4 @@ window.quadrantBlink = {
     }
   }
 };
+

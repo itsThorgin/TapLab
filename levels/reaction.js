@@ -1,5 +1,5 @@
 window.reaction = {
-    rounds: 5,
+    rounds: 10,
     currentRound: 0,
     times: [],
     timeoutIds: [],
@@ -29,7 +29,7 @@ window.reaction = {
         const panel = document.getElementById('level-specific-settings');
         panel.innerHTML = `
             <label>Rounds: 
-                <input type="number" id="reaction-rounds" min="3" max="10" value="${this.rounds}">
+                <input type="number" id="reaction-rounds" min="5" max="50" value="${this.rounds}">
             </label><br><br>
             <label>
                 <input type="checkbox" id="reaction-false-start" ${this.falseStartEnabled ? 'checked' : ''}>
@@ -464,3 +464,4 @@ window.reaction = {
     }
 
 };
+

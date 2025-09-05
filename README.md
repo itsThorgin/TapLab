@@ -57,22 +57,22 @@ Every *xx* ms, one quadrant lights up briefly. Click the highlighted quadrant **
 Open the **⚙ Settings** panel:
 
 **Reaction Test**  
-- Rounds (3-10)  
+- Rounds (5-50)  
 - *False Start Trick* on/off
 
 **Pop-up Targets**  
-- Number of targets (1-50)  
+- Number of targets (5-50)  
 - Target size (5-25 px)  
 - False target on/off + probability (0-1, step 0.05)
 
 **Peripheral Awareness**  
-- Rounds (3-10)  
+- Rounds (5-50)  
 - True target size (3/6/9 px)  
-- Distractor count (6-30)  
+- Distractor count (10-50)  
 - **Same color mode** (true target blinks)
 
 **Quadrant Blink**  
-- Highlights count (10-200)  
+- Highlights count (5-50)  
 - Blink speed (100-1500 ms, step 25)
 
 **Reset buttons**  

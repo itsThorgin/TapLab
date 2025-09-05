@@ -33,6 +33,17 @@ window.quadrantBlink = {
   },
 
   resetState() {
+    // stop quadrant interval
+    if (this.intervalId !== null) {
+      clearInterval(this.intervalId);
+      this.intervalId = null;
+    }
+
+    // clear any queued timeouts
+    this.timeoutIds.forEach(id => clearTimeout(id));
+    this.timeoutIds = [];
+
+    // runtime state resets
     this.currentIndex = 0;
     this.activeQuadrant = null;
     this.lastQuadrant = null;
@@ -46,15 +57,13 @@ window.quadrantBlink = {
     this.missedIntervals = 0;
 
     this.gameActive = false;
-    this.timeoutIds.forEach(id => clearTimeout(id));
-    this.timeoutIds = [];
   },
 
   renderSettingsPanel() {
     const panel = document.getElementById('level-specific-settings');
     panel.innerHTML = `
       <label>Intervals (count):
-        <input type="number" id="qb-count" min="10" max="200" value="${this.intervalsCount}">
+        <input type="number" id="qb-count" min="5" max="50" value="${this.intervalsCount}">
       </label><br><br>
       <label>Blink speed (ms, 100-1500, step 25):
         <input type="number" id="qb-speed" min="100" max="1500" step="25" value="${this.blinkIntervalMs}">
@@ -183,8 +192,7 @@ window.quadrantBlink = {
         background:#2ec4b6;
         transition: opacity ${Math.min(120, this.blinkIntervalMs*0.3)}ms ease;
       `;
-      const halfW = area.clientWidth / 2;
-      const halfH = area.clientHeight / 2;
+      
       // position
       switch (k) {
         case 'UL': overlay.style.left='0%'; overlay.style.top='0%'; overlay.style.width='50%'; overlay.style.height='50%'; break;
@@ -215,7 +223,16 @@ window.quadrantBlink = {
     // clear previous highlights
     ['UL','UR','LL','LR'].forEach(k => {
       const el = document.getElementById(`qb-ov-${k}`);
-      if (el) el.style.opacity = (k === this.activeQuadrant) ? '0.35' : '0';
+      if (!el) return;
+
+      // restore prior transition if it changed during flash
+      if (el.dataset._prevTransition !== undefined) {
+        el.style.transition = el.dataset._prevTransition;
+        delete el.dataset._prevTransition;
+      }
+
+      // baseline opacities
+      el.style.opacity = (k === this.activeQuadrant) ? '0.35' : '0';
     });
 
     // start timing and accept clicks and sync the timing with paint
@@ -223,7 +240,7 @@ window.quadrantBlink = {
       this.intervalStart = performance.now();
       this.roundReady = true;
     });
-    
+
     // ensure a slot exists for this interval in arrays
     this.times[this.currentIndex] = null;
     this.labels[this.currentIndex] = 'missed'; // default - overwritten on correct click
@@ -263,6 +280,8 @@ window.quadrantBlink = {
       const rt = Math.round(performance.now() - this.intervalStart);
       this.times[this.currentIndex] = rt;
       this.labels[this.currentIndex] = 'correct';
+
+      this.flashOverlayUntilNextTick(this.activeQuadrant, 0.95);
     } else {
       this.wrongClicks++;
       // stays 'missed' for this interval (no correct click)
@@ -287,9 +306,10 @@ window.quadrantBlink = {
       const fastEnoughCount = results.times.filter(
         (t, i) => results.labels[i] === 'correct' && t !== null && t <= nextSpeed
       ).length;
-      const consistency = correctCount ? (fastEnoughCount / correctCount) : 0;
+
+      consistency = correctCount ? (fastEnoughCount / correctCount) : 0;
     }
-      
+    
     const qualifies = (
       correctCount >= neededCorrect &&
       consistency >= 0.5
@@ -304,7 +324,19 @@ window.quadrantBlink = {
       qualifies
     };
   },
-  
+
+  flashOverlayUntilNextTick(k, peak = 0.8) {
+    const ov = document.getElementById(`qb-ov-${k}`);
+    if (!ov) return;
+
+    // quick brighten
+    const prevTransition = ov.style.transition;
+    ov.style.transition = 'opacity 60ms ease';
+    ov.style.opacity = String(peak);
+
+    ov.dataset._prevTransition = prevTransition || '';
+  },
+
   finish() {
     this.gameActive = false;
 
@@ -357,7 +389,7 @@ window.quadrantBlink = {
         </tr>
       `;
     }).join('');
-
+ 
     container.innerHTML = `
       <div style="max-width:95%; margin:auto; color:#e0e1dd;">
         <h2 style="text-align:center;">Quadrant Blink Results</h2>
@@ -368,7 +400,7 @@ window.quadrantBlink = {
           <span>Speed: <strong>${results.blinkIntervalMs} ms</strong> · Intervals: <strong>${results.intervalsCount}</strong></span>
         </div>
 
-        <div style="margin:8px 0; text-align:center; padding-top:6px; font-size:0.9em;">
+         <div style="margin:8px 0; text-align:center; padding-top:6px; font-size:0.9em;">
           <div>Accuracy: <strong>${progress.accuracy}% </strong> ${progress.correctCount >= progress.neededCorrect ? '✓' : '✗'}
             (${progress.correctCount} / ${results.intervalsCount}, need ${progress.neededCorrect} for <strong>75%</strong>)</div>
           <div>Consistency: <strong>${progress.consistency}%</strong> ${progress.consistency >= 50 ? '✓' : '✗'}
@@ -398,12 +430,13 @@ window.quadrantBlink = {
 
         <div style="text-align:center; margin-top:14px;">
           <button onclick="window.quadrantBlink.startGame()">Restart</button>
-          <button onclick="returnToMenu()">Back to Menu</button>
+          <button onclick="window.quadrantBlink.returnToMenu()">Back to Menu</button>
         </div>
       </div>
     `;
   },
 
+  // settings saved msg
   showPopupMessage: function(text) {
         const panel = document.getElementById('settings-panel');
         const msg = document.createElement('div');
@@ -415,7 +448,7 @@ window.quadrantBlink = {
         panel.appendChild(msg);
         setTimeout(()=>msg.remove(), 1500);
     },
-  
+
   showHistory() {
     const history = JSON.parse(localStorage.getItem('quadrantBlink_history') || '[]');
     const container = document.getElementById('game-container');
@@ -475,11 +508,9 @@ window.quadrantBlink = {
     const container = document.getElementById('game-container');
     container.innerHTML = '';
     container.classList.add('hidden');
-    returnToMenu();
+    
+    if (typeof window.returnToMenu === 'function') {
+      window.returnToMenu();
+    }
   }
-
 };
-
-
-
-

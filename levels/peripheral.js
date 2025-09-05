@@ -3,8 +3,8 @@ window.peripheral = {
   rounds: 10,
   trueTargetSize: 6,           // 3 | 6 | 9 px
   distractorCount: 12,
-  distractorMin: 15,
-  distractorMax: 25,
+  distractorMin: 3,            // size px
+  distractorMax: 30,
 
   // runtime state
   currentRound: 0,
@@ -42,7 +42,7 @@ window.peripheral = {
     const panel = document.getElementById('level-specific-settings');
     panel.innerHTML = `
       <label>Rounds:
-        <input type="number" id="periph-rounds" min="3" max="10" value="${this.rounds}">
+        <input type="number" id="periph-rounds" min="5" max="50" value="${this.rounds}">
       </label><br><br>
       <label>True target size:
         <select id="periph-size">
@@ -51,8 +51,8 @@ window.peripheral = {
           <option value="9" ${this.trueTargetSize===9?'selected':''}>9 px</option>
         </select>
       </label><br><br>
-      <label>Distractors (15-25 px):
-        <input type="number" id="periph-distractors" min="6" max="30" value="${this.distractorCount}">
+      <label>Distractors:
+        <input type="number" id="periph-distractors" min="10" max="50" value="${this.distractorCount}">
       </label><br><br>
       <label>
         <input type="checkbox" id="periph-uniform" ${this.uniformColor ? 'checked' : ''}>
@@ -69,9 +69,9 @@ window.peripheral = {
     const distractorCount = parseInt(document.getElementById('periph-distractors').value);
     const uniformColor = document.getElementById('periph-uniform').checked;
 
-    this.rounds = Math.min(10, Math.max(3, rounds || 10));
+    this.rounds = Math.min(50, Math.max(5, rounds || 5));
     this.trueTargetSize = [3,6,9].includes(trueTargetSize) ? trueTargetSize : 6;
-    this.distractorCount = Math.min(30, Math.max(6, distractorCount || 12));
+    this.distractorCount = Math.min(50, Math.max(10, distractorCount || 10));
     this.uniformColor = uniformColor;
 
     localStorage.setItem('peripheral_settings', JSON.stringify({
@@ -591,5 +591,6 @@ window.peripheral = {
   }
 
 };
+
 
 

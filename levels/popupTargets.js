@@ -38,7 +38,7 @@ window.popupTargets = {
         const panel = document.getElementById('level-specific-settings');
         panel.innerHTML = `
             <label>Number of targets: 
-                <input type="number" id="popup-count" min="1" max="50" value="${this.targetCount}">
+                <input type="number" id="popup-count" min="5" max="50" value="${this.targetCount}">
             </label><br><br>
             <label>Target size: 
                 <select id="popup-size">
@@ -482,4 +482,5 @@ window.popupTargets = {
     }
 
 };
+
 

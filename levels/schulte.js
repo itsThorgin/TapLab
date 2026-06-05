@@ -98,7 +98,7 @@ window.schulte = {
         `;
     },
 
-    // load the fixed official preset (bypasses saved settings) and start.
+    // load the fixed official preset (bypasses saved settings) and start
     startOfficial() {
         this.isOfficial = true;
         this.gridSize = this.OFFICIAL.gridSize;
@@ -134,7 +134,7 @@ window.schulte = {
         }
 
         // fallback (unlikely to be needed)
-        // a single rotation guarantees no element stays in place for n >= 2.
+        // a single rotation guarantees no element stays in place for n >= 2
         const rotated = values.slice();
         const last = rotated.pop();
         rotated.unshift(last);
@@ -297,15 +297,10 @@ window.schulte = {
             const btns = board.querySelectorAll('.schulte-cell');
             const btn = btns[index];
             if (btn) {
-                const prevBg = btn.style.background;
-                btn.style.background = '#e63946';
-                btn.style.color = '#fff';
+                // uses a class (with !important) so the flash beats the :hover rule
+                btn.classList.add('error');
                 const id = setTimeout(() => {
-                    // only restore if the cell is still unpicked (board may have re rendered)
-                    if (this.cells[index] && !this.cells[index].picked) {
-                        btn.style.background = prevBg || '#1b263b';
-                        btn.style.color = '#e0e1dd';
-                    }
+                    if (btn) btn.classList.remove('error');
                 }, 250);
                 this.timeoutIds.push(id);
             }
@@ -350,7 +345,7 @@ window.schulte = {
 
     // tiers on time-per-cell so they're fair across grid sizes
     // grounded in documented 5x5 click norms: exceptional <15s, good ~20-30s, typical ~30-45s
-    // per cell (÷25): <0.6s exceptional, ~0.8 good, ~1.1-1.4 typical.
+    // per cell (÷25): <0.6s exceptional, ~0.8 good, ~1.1-1.4 typical
     getCategoryForPerCell(ms) {
         if (ms <= 600)  return { label: "Phenomenal", color: "#00e5ff", range: "≤ 0.60 s/cell - exceptional (≈15s on 5x5)" };
         if (ms <= 800)  return { label: "Elite",      color: "#4caf50", range: "0.60–0.80 s/cell - very fast (≈20s on 5x5)" };

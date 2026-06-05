@@ -20,12 +20,21 @@ document.getElementById('reset-level').addEventListener('click', () => {
 });
 
 document.addEventListener('keydown', (e) => {
+    // ignore 'm' shortcut while the user is typing in a field
+    const el = document.activeElement;
+    if (el && (
+        (el.tagName === 'INPUT' && ['text','password','email','search','url','tel','number'].includes(el.type)) ||
+        el.tagName === 'TEXTAREA' ||
+        el.isContentEditable
+    )) {
+        return;
+    }
     if (e.key.toLowerCase() === 'm') toggleSettings();
 });
 
 showGlobalSettingsPanel();
 
-// Shared countdown overlay, resolves when finished
+// shared countdown overlay
 window.show321 = function show321(host, stepMs = 500) {
     return new Promise(resolve => {
         const overlay = document.createElement('div');

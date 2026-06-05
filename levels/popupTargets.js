@@ -3,6 +3,9 @@ window.popupTargets = {
     targetSize: 25,
     falseTargetEnabled: false,
     falseTargetChance: 0.25,
+    isOfficial: false,
+    OFFICIAL: { count: 25, size: 10, falseTarget: true, falseChance: 0.3 },
+    officialLabel: "Official: 25 targets, 10px, false-targets on (0.3)",
     currentIndex: 0,
     times: [],
     hoverTimes: [],
@@ -29,6 +32,7 @@ window.popupTargets = {
         this.misses = [];
         this.falseHits = [];
         this.gameActive = false;
+        this.isOfficial = false;
 
         this.renderSettingsPanel();
         this.showInstruction();
@@ -83,6 +87,7 @@ window.popupTargets = {
                 <tr>
                     <td>${idx+1}</td>
                     <td>${h.date}</td>
+                    <td>${h.official ? '★ Official' : '-'}</td>
                     <td>${h.targetCount} × ${h.targetSize}px</td>
                     <td>${h.avgHover} ms</td>
                     <td>${h.avgClick} ms</td>
@@ -100,7 +105,7 @@ window.popupTargets = {
                 <div style="max-height:70vh; overflow-y:auto;">
                     <table class="results-table">
                         <tr>
-                            <th>#</th><th>Date</th><th>Config</th>
+                            <th>#</th><th>Date</th><th>Mode</th><th>Config</th>
                             <th>Avg Hover</th><th>Avg Click</th><th>Avg Total</th>
                             <th>Total Time</th><th>Misses</th><th>False Hits</th>
                         </tr>
@@ -115,10 +120,12 @@ window.popupTargets = {
     },
 
     saveSettings: function() {
-        const count = parseInt(document.getElementById('popup-count').value);
+        let count = parseInt(document.getElementById('popup-count').value);
+        count = Number.isFinite(count) ? Math.min(50, Math.max(5, count)) : 10;
         const size = parseInt(document.getElementById('popup-size').value);
         const falseTarget = document.getElementById('popup-false-target').checked;
-        const falseChance = parseFloat(document.getElementById('popup-false-chance').value);
+        let falseChance = parseFloat(document.getElementById('popup-false-chance').value);
+        falseChance = Number.isFinite(falseChance) ? Math.min(1, Math.max(0, falseChance)) : 0.3;
         localStorage.setItem('popupTargets_settings', JSON.stringify({ count, size, falseTarget, falseChance }));
         this.targetCount = count;
         this.targetSize = size;
@@ -140,11 +147,23 @@ window.popupTargets = {
                     ${this.targetCount} targets total.
                 </p>
                 <div style="display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.popupTargets.startGame()">Start</button>
+                    <button onclick="window.popupTargets.isOfficial=false;window.popupTargets.startGame()">Start</button>
+                    <button onclick="window.popupTargets.startOfficial()">Start Official</button>
                     <button onclick="window.popupTargets.returnToMenu()">Back to Menu</button>
                 </div>
+                <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
             </div>
         `;
+    },
+
+    // load the fixed official preset (bypasses saved settings) and start.
+    startOfficial: function() {
+        this.isOfficial = true;
+        this.targetCount = this.OFFICIAL.count;
+        this.targetSize = this.OFFICIAL.size;
+        this.falseTargetEnabled = this.OFFICIAL.falseTarget;
+        this.falseTargetChance = this.OFFICIAL.falseChance;
+        this.startGame();
     },
 
     startGame: function() {
@@ -165,7 +184,7 @@ window.popupTargets = {
 
         const area = document.getElementById('popup-area');
 
-        // Count misses
+        // count misses
         area.addEventListener('mousedown', (e) => {
             if (!this.gameActive) return;
             if (this.inCountdown) return;
@@ -273,7 +292,7 @@ window.popupTargets = {
             return; // exit (no real target here)
         }
 
-        // Otherwise spawn REAL target
+        // otherwise spawn REAL target
         const realTarget = document.createElement('div');
         realTarget.id = 'popup-target';
         realTarget.style.width = `${this.targetSize}px`;
@@ -354,6 +373,7 @@ window.popupTargets = {
             avgClick,
             avgTotal,
             totalSessionTime,
+            official: this.isOfficial,
             _customOverlay: true
         };
         this.showResultsOverlay(results);
@@ -369,7 +389,8 @@ window.popupTargets = {
             avgTotal,
             totalSessionTime,
             misses: this.misses,
-            falseHits: this.falseHits
+            falseHits: this.falseHits,
+            official: this.isOfficial
         });
         localStorage.setItem('popupTargets_history', JSON.stringify(history));
     },
@@ -390,28 +411,25 @@ window.popupTargets = {
         }
 
         container.innerHTML = `
-            <div style="text-align:center; margin-top:20px; max-width:720px; margin:auto; color:#e0e1dd;">
-                <h2>Pop-up Targets</h2>
-                <p>Average hover: ${results.avgHover} ms</p>
-                <p>Average click delay: ${results.avgClick} ms</p>
-                <p>Average total: ${results.avgTotal} ms</p>
-                <p>Total session time: ${(results.totalSessionTime/1000).toFixed(2)} s</p>
-
-                <div style="max-height:60vh; overflow-y:auto; margin-top:10px; border:1px solid #555; border-radius:6px;">
-                    <table class="results-table" style="margin:0 auto;max-width:600px; width:100%;">
-                        <tr>
-                            <th>#</th>
-                            <th>Hover(ms)</th>
-                            <th>Click delay(ms)</th>
-                            <th>Total(ms)</th>
-                            <th>Misses</th>
-                            <th>False Hits</th>
-                        </tr>
+            <div style="text-align:center;color:#e0e1dd; max-width:640px; margin:auto;">
+                <h2>Pop-up Targets${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
+                <table style="margin:8px auto 10px auto;border-collapse:collapse;color:white;">
+                    <tr><td style="text-align:left;">Avg total</td>
+                        <td style="text-align:right;padding-left:24px;">${results.avgTotal} ms</td></tr>
+                    <tr><td style="text-align:left;">Avg hover</td>
+                        <td style="text-align:right;padding-left:24px;">${results.avgHover} ms</td></tr>
+                    <tr><td style="text-align:left;">Avg click delay</td>
+                        <td style="text-align:right;padding-left:24px;">${results.avgClick} ms</td></tr>
+                    <tr><td style="text-align:left;">Total session</td>
+                        <td style="text-align:right;padding-left:24px;">${(results.totalSessionTime/1000).toFixed(2)} s</td></tr>
+                </table>
+                <div style="max-height:300px; overflow-y:auto;">
+                    <table class="results-table" style="margin:0 auto;">
+                        <tr><th>#</th><th>Hover</th><th>Click</th><th>Total</th><th>Miss</th><th>False</th></tr>
                         ${rows}
                     </table>
                 </div>
-
-                <div style="margin-top:14px; display:flex; gap:10px; justify-content:center;">
+                <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
                     <button onclick="window.popupTargets.startGame()">Restart</button>
                     <button onclick="returnToMenu()">Back to Menu</button>
                 </div>
@@ -482,5 +500,3 @@ window.popupTargets = {
     }
 
 };
-
-

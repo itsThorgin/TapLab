@@ -176,3 +176,12 @@ h1, h2 {
   font-size:.95em;
   max-width:min(92vw, 440px);
 }
+
+/* schulte table cells */
+.schulte-cell {
+    line-height: 1;
+    border: 1px solid rgba(255,255,255,0.06);
+}
+.schulte-cell:not(.picked):hover {
+    background-color: #2a3a55 !important;
+}

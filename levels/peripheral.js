@@ -18,6 +18,9 @@ window.peripheral = {
   inCountdown: false,
   roundReady: false,     // stops clicks until target is active
   uniformColor: false,   // all dots same color + true target blinks 3x for peripheral round
+  isOfficial: false,
+  OFFICIAL: { rounds: 25, trueTargetSize: 3, distractorCount: 50, uniformColor: true },
+  officialLabel: "Official: 25 rounds, 3px target, 50 distractors, uniform color",
 
   init(endCallback) {
     const saved = JSON.parse(localStorage.getItem('peripheral_settings') || '{}');
@@ -31,6 +34,7 @@ window.peripheral = {
     this.mistakes = [];
     this.timeoutIds = [];
     this.gameActive = false;
+    this.isOfficial = false;
 
     this.renderSettingsPanel();
     this.showInstruction();
@@ -98,11 +102,23 @@ window.peripheral = {
           ${this.rounds} rounds total.
         </p>
         <div style="display:flex; gap:10px; justify-content:center;">
-          <button onclick="window.peripheral.startGame()">Start</button>
+          <button onclick="window.peripheral.isOfficial=false;window.peripheral.startGame()">Start</button>
+          <button onclick="window.peripheral.startOfficial()">Start Official</button>
           <button onclick="window.peripheral.returnToMenu()">Back to Menu</button>
         </div>
+        <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
       </div>
     `;
+  },
+
+  // load the fixed official preset (bypasses saved settings) and start.
+  startOfficial() {
+    this.isOfficial = true;
+    this.rounds = this.OFFICIAL.rounds;
+    this.trueTargetSize = this.OFFICIAL.trueTargetSize;
+    this.distractorCount = this.OFFICIAL.distractorCount;
+    this.uniformColor = this.OFFICIAL.uniformColor;
+    this.startGame();
   },
 
   startGame() {
@@ -113,7 +129,7 @@ window.peripheral = {
     this.timeoutIds = [];
     this.gameActive = true;
     
-    // Build the arena UI
+    // build the arena UI
     const container = document.getElementById('game-container');
     container.innerHTML = `
       <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
@@ -132,14 +148,14 @@ window.peripheral = {
 
     const area = document.getElementById('peripheral-area');
 
-    // Crosshair quadrants
+    // crosshair quadrants
     const hLine = document.createElement('div');
     hLine.style.cssText = `position:absolute; left:0; top:50%; width:100%; height:2px; background:rgba(255,255,255,0.35); transform:translateY(-1px);`;
     const vLine = document.createElement('div');
     vLine.style.cssText = `position:absolute; top:0; left:50%; height:100%; width:2px; background:rgba(255,255,255,0.35); transform:translateX(-1px);`;
     area.appendChild(hLine); area.appendChild(vLine);
 
-    // Center fixation dot
+    // center fixation dot
     const centerDot = document.createElement('div');
     centerDot.style.cssText = `
       position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -147,7 +163,7 @@ window.peripheral = {
     `;
     area.appendChild(centerDot);
 
-    // Quadrant overlays (to click targets)
+    // quadrant overlays (to click targets)
     const quads = [
       { key: 'UL', left: 0,   top: 0 },
       { key: 'UR', left: 50,  top: 0 },
@@ -179,7 +195,7 @@ window.peripheral = {
       area.appendChild(Q);
     });
 
-    // Distractors
+    // distractors
     this.placeDistractors(area);
 
     // countdown, then first spawn
@@ -212,14 +228,14 @@ window.peripheral = {
 
     const area = document.getElementById('peripheral-area');
 
-    // Crosshair quadrants
+    // crosshair quadrants
     const hLine = document.createElement('div');
     hLine.style.cssText = `position:absolute; left:0; top:50%; width:100%; height:2px; background:rgba(255,255,255,0.35); transform:translateY(-1px);`;
     const vLine = document.createElement('div');
     vLine.style.cssText = `position:absolute; top:0;left:50%; height:100%; width:2px; background:rgba(255,255,255,0.35); transform:translateX(-1px);`;
     area.appendChild(hLine); area.appendChild(vLine);
 
-    // Center fixation dot
+    // center fixation dot
     const centerDot = document.createElement('div');
     centerDot.style.cssText = `
       position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -227,7 +243,7 @@ window.peripheral = {
     `;
     area.appendChild(centerDot);
 
-    // Quadrant overlays (toclick targets)
+    // quadrant overlays (to click targets)
     const quads = [
       { key: 'UL', left: 0,   top: 0 },
       { key: 'UR', left: 50,  top: 0 },
@@ -259,7 +275,7 @@ window.peripheral = {
       area.appendChild(Q);
     });
 
-    // Distractors
+    // distractors
     this.placeDistractors(area);
 
     // little countdown before spawning
@@ -272,11 +288,11 @@ window.peripheral = {
     const w = area.clientWidth;
     const h = area.clientHeight;
 
-    // Pick quadrant
+    // pick quadrant
     const quadrants = ['UL','UR','LL','LR'];
     this.targetQuadrant = quadrants[Math.floor(Math.random() * 4)];
 
-    // Compute bounds for target within chosen quadrant (+ padding)
+    // compute bounds for target within chosen quadrant (+ padding)
     const pad = Math.max(12, this.trueTargetSize + 8);
     const halfW = w / 2, halfH = h / 2;
 
@@ -304,7 +320,7 @@ window.peripheral = {
       }
     } while (!ok && tries < 80);
 
-    // True target dot
+    // true target dot
     const trueColor = '#2ec4b6';
     const dot = document.createElement('div');
     dot.style.cssText = `
@@ -325,7 +341,7 @@ window.peripheral = {
         this.roundReady = true;   // allows clicks during blinking
       });
 
-      // Blink the target 3x, then make the round active
+      // blink the target 3x, then make the round active
       const blinks = 3, interval = 140;
       let toggles = 0;
       const blinkTimer = setInterval(() => {
@@ -337,7 +353,7 @@ window.peripheral = {
         }
       }, interval);
     } else {
-      // Normal mode: ready immediately after paint
+      // normal mode: ready immediately after paint
       requestAnimationFrame(() => {
         this.spawnTime = performance.now();
         this.roundReady = true;
@@ -437,6 +453,7 @@ window.peripheral = {
       average: avg,   // null if no correct rounds
       mistakesTotal,
       rounds: this.rounds,
+      official: this.isOfficial,
       _customOverlay: true
     };
 
@@ -452,7 +469,8 @@ window.peripheral = {
       distractorCount: this.distractorCount,
       average: avg,
       mistakesTotal,
-      times: this.times
+      times: this.times,
+      official: this.isOfficial
     });
     localStorage.setItem('peripheral_history', JSON.stringify(history));
   },
@@ -460,47 +478,37 @@ window.peripheral = {
   showResultsOverlay(results) {
     const container = document.getElementById('game-container');
 
-    // builds labels from mistakes and times
+    // per round table (correct / wrong / missed)
     const labels = results.times.map((t, i) => {
       if (results.mistakes[i]) return 'wrong';
       if (!Number.isFinite(t)) return 'missed';
       return 'correct';
     });
-  
     const rows = results.times.map((t, i) => {
       const L = labels[i];
-      const tdisp = Number.isFinite(t) ? `${t} ms` : '<strong>- - -</strong>';
-      const color =
-        L === 'correct' ? '#2ec4b6' :
-        L === 'wrong'   ? '#ffb300' :
-                          '#f44336';
-      return `
-        <tr>
-          <td>${i + 1}</td>
-          <td style="color:${color};">${tdisp}</td>
-          <td>${L}</td>
-        </tr>
-      `;
+      const tdisp = Number.isFinite(t) ? `${t} ms` : '- - -';
+      const color = L === 'correct' ? '#2ec4b6' : L === 'wrong' ? '#ffb300' : '#f44336';
+      return `<tr><td>${i + 1}</td><td style="color:${color};">${tdisp}</td><td>${L}</td></tr>`;
     }).join('');
-  
-    container.innerHTML = `
-      <div style="max-width:95%; margin:auto; color:#e0e1dd;">
-        <h2 style="text-align:center;">Peripheral Awareness Results</h2>
-        <div style="margin:8px 0; text-align:center;">
-          <span>Avg Reaction Time (correct only): <strong>${results.average ?? '-'}</strong>${results.average ? ' ms' : ''}</span><br>
-          <span>Mistakes: <strong>${results.mistakesTotal}</strong></span>
-        </div>
 
+    container.innerHTML = `
+      <div style="text-align:center;color:#e0e1dd; max-width:560px; margin:auto;">
+        <h2>Peripheral Awareness${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
+        <table style="margin:8px auto 10px auto;border-collapse:collapse;color:white;">
+          <tr><td style="text-align:left;">Avg reaction (correct)</td>
+              <td style="text-align:right;padding-left:24px;">${results.average !== null ? results.average + ' ms' : '-'}</td></tr>
+          <tr><td style="text-align:left;">Mistakes</td>
+              <td style="text-align:right;padding-left:24px;">${results.mistakesTotal}</td></tr>
+          <tr><td style="text-align:left;">Rounds</td>
+              <td style="text-align:right;padding-left:24px;">${results.rounds}</td></tr>
+        </table>
         <div style="max-height:300px; overflow-y:auto;">
-          <table class="results-table">
-            <tr>
-              <th>#</th><th>Reaction Time</th><th>Label</th>
-            </tr>
+          <table class="results-table" style="margin:0 auto;">
+            <tr><th>#</th><th>Reaction</th><th>Label</th></tr>
             ${rows}
           </table>
         </div>
-
-        <div style="text-align:center; margin-top:14px;">
+        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
           <button onclick="window.peripheral.startGame()">Restart</button>
           <button onclick="returnToMenu()">Back to Menu</button>
         </div>
@@ -527,6 +535,7 @@ window.peripheral = {
       <tr>
         <td>${i+1}</td>
         <td>${h.date}</td>
+        <td>${h.official ? '★ Official' : '-'}</td>
         <td>${h.rounds}r / ${h.trueTargetSize}px / ${h.distractorCount} distractors</td>
         <td>${h.average ?? '-'}</td>
         <td>${h.mistakesTotal}</td>
@@ -540,7 +549,7 @@ window.peripheral = {
         <div style="max-height:70vh; overflow-y:auto;">
           <table class="results-table">
             <tr>
-              <th>#</th><th>Date</th><th>Config</th><th>Average</th><th>Mistakes</th><th>Times</th>
+              <th>#</th><th>Date</th><th>Mode</th><th>Config</th><th>Average</th><th>Mistakes</th><th>Times</th>
             </tr>
             ${rows}
           </table>
@@ -591,6 +600,3 @@ window.peripheral = {
   }
 
 };
-
-
-

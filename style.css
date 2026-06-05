@@ -185,3 +185,10 @@ h1, h2 {
 .schulte-cell:not(.picked):hover {
     background-color: #2a3a55 !important;
 }
+/* error flash */
+.schulte-cell.error,
+.schulte-cell.error:hover {
+    background-color: #e63946 !important;
+    color: #fff !important;
+    transition: none !important;
+}

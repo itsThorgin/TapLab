@@ -1,5 +1,8 @@
 window.reaction = {
-    rounds: 10,
+    rounds: 5,
+    isOfficial: false,
+    OFFICIAL: { rounds: 25, falseStart: true },
+    officialLabel: "Official: 25 rounds, false-start on",
     currentRound: 0,
     times: [],
     timeoutIds: [],
@@ -11,7 +14,8 @@ window.reaction = {
 
     init: function(endCallback) {
         const savedSettings = JSON.parse(localStorage.getItem('reaction_settings')) || {};
-        this.rounds = savedSettings.rounds || 5;
+        const sr = parseInt(savedSettings.rounds);
+        this.rounds = (Number.isFinite(sr) && sr >= 5 && sr <= 50) ? sr : 5;
         this.falseStartEnabled = savedSettings.falseStart || false;
 
         this.endCallback = endCallback;
@@ -20,6 +24,7 @@ window.reaction = {
         this.falseStarts = [];
         this.timeoutIds = [];
         this.gameActive = false;
+        this.isOfficial = false;
 
         this.renderSettingsPanel();
         this.showInstruction();
@@ -46,7 +51,8 @@ window.reaction = {
     },
 
     saveSettings: function() {
-        const rounds = parseInt(document.getElementById('reaction-rounds').value);
+        let rounds = parseInt(document.getElementById('reaction-rounds').value);
+        rounds = (Number.isFinite(rounds)) ? Math.min(50, Math.max(5, rounds)) : 5;
         const falseStart = document.getElementById('reaction-false-start').checked;
         localStorage.setItem('reaction_settings', JSON.stringify({ rounds, falseStart }));
         this.showPopupMessage("Settings saved.");
@@ -67,14 +73,28 @@ window.reaction = {
                     ${this.rounds} rounds total.
                 </p>
                 <div style="display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.reaction.startFirstRound()">Start</button>
+                    <button onclick="window.reaction.isOfficial=false;window.reaction.startFirstRound()">Start</button>
+                    <button onclick="window.reaction.startOfficial()">Start Official</button>
                     <button onclick="window.reaction.returnToMenu()">Back to Menu</button>
                 </div>
+                <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
             </div>
         `;
     },
 
+    // load the fixed official preset (bypasses saved settings) and start.
+    startOfficial: function() {
+        this.isOfficial = true;
+        this.rounds = this.OFFICIAL.rounds;
+        this.falseStartEnabled = this.OFFICIAL.falseStart;
+        this.currentRound = 0;
+        this.times = [];
+        this.falseStarts = [];
+        this.startFirstRound();
+    },
+
     startRound: function() {
+        this.clearTemporaryMessage(); // cancel any pending message from the prior attempt
         this.gameActive = true;
         const container = document.getElementById('game-container');
         container.innerHTML = `
@@ -143,6 +163,7 @@ window.reaction = {
     },
 
     goSignal: function(box) {
+        this.clearTemporaryMessage(); // ensure no stale message overlaps the go color
         box.style.transition = "none";
         box.style.background = '#2ec4b6';
         // start timer only after frame renders with new color
@@ -176,7 +197,7 @@ window.reaction = {
             return;
         }
 
-        // Correct click
+        // correct click
         this.falseStarts[this.currentRound] = this.falseStarts[this.currentRound] || false;
         this.clickable = false;
         const reactionTime = Math.round(performance.now() - this.startTime);
@@ -214,6 +235,7 @@ window.reaction = {
             <tr>
                 <td>${i+1}</td>
                 <td>${h.date}</td>
+                <td>${h.official ? '★ Official' : '-'}</td>
                 <td>${h.rounds}${h.falseStartEnabled ? " (false-start on)" : ""}</td>
                 <td>${h.average} ms</td>
                 <td>${h.bracket}</td>
@@ -227,7 +249,7 @@ window.reaction = {
                 <div style="max-height:70vh; overflow-y:auto;">
                     <table class="results-table">
                         <tr>
-                            <th>#</th><th>Date</th><th>Config</th><th>Average</th><th>Bracket</th><th>Times</th>
+                            <th>#</th><th>Date</th><th>Mode</th><th>Config</th><th>Average</th><th>Bracket</th><th>Times</th>
                         </tr>
                         ${rows}
                     </table>
@@ -249,6 +271,7 @@ window.reaction = {
             falseStarts: this.falseStarts,
             average,
             bracket: category.label,
+            official: this.isOfficial,
             _customOverlay: true
         };
 
@@ -263,6 +286,7 @@ window.reaction = {
             falseStartEnabled: this.falseStartEnabled,
             average,
             bracket: category.label,
+            official: this.isOfficial,
             times: this.times
         });
         localStorage.setItem('reaction_history', JSON.stringify(history));
@@ -284,7 +308,11 @@ window.reaction = {
         const box = document.getElementById('reaction-box');
         if (!box) return;  // safe check
 
+        // remove any existing message first so they never stack/linger
+        this.clearTemporaryMessage();
+
         let msg = document.createElement("div");
+        msg.id = 'reaction-msg';
         msg.textContent = text;
         msg.style.cssText = `
             position:absolute;
@@ -300,21 +328,30 @@ window.reaction = {
             pointer-events:none;
             backdrop-filter:saturate(120%) blur(0.5px);
         `;
-        
+
         box.style.position = 'relative';
         box.appendChild(msg);
-        setTimeout(() => {
-            msg.style.transition = "opacity 0.4s";
+        // fast: ~350ms visible, ~150ms fade
+        this._msgHideId = setTimeout(() => {
+            msg.style.transition = "opacity 0.15s";
             msg.style.opacity = "0";
-            setTimeout(() => msg.remove(), 400);
-        }, 1200);
+            this._msgRemoveId = setTimeout(() => msg.remove(), 150);
+        }, 350);
+    },
+
+    // immediately remove any temporary message (called when a new signal/round starts)
+    clearTemporaryMessage: function() {
+        if (this._msgHideId) { clearTimeout(this._msgHideId); this._msgHideId = null; }
+        if (this._msgRemoveId) { clearTimeout(this._msgRemoveId); this._msgRemoveId = null; }
+        const existing = document.getElementById('reaction-msg');
+        if (existing) existing.remove();
     },
 
     showResultsOverlay: function(results) {
         const container = document.getElementById('game-container');
         const category = this.getCategoryForMs(results.average);
 
-        // Benchmark ranges definition
+        // benchmark ranges
         const benchmarks = [
             { label: "On The Top", range: "≤ 130 ms", color: "#00e5ff" },
             { label: "Elite", range: "131-150 ms", color: "#4caf50" },
@@ -324,7 +361,7 @@ window.reaction = {
             { label: "Below Average", range: "> 260 ms", color: "#f44336" }
         ];
 
-        // Create benchmark HTML
+        // create benchmark HTML
         const benchmarkHTML = `
             <div class="badge-stack">
                 ${benchmarks.map(b => `
@@ -336,7 +373,7 @@ window.reaction = {
             </div>
         `;
 
-        // Table with results
+        // table with results
         const timesHTML = results.times.map((t, i) => {
             const failed = results.falseStarts && results.falseStarts[i];
             const timeDisplay = t !== null ? `${t} ms` : '';
@@ -349,10 +386,10 @@ window.reaction = {
                     </tr>`;
         }).join("");
 
-        // Render
+        // render
         container.innerHTML = `
             <div style="text-align:center;color:#e0e1dd;">
-                <h2>Reaction Test</h2>
+                <h2>Reaction Test${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
 
                 <div class="results-layout">
                     <!-- LEFT column -->
@@ -370,8 +407,12 @@ window.reaction = {
                             <small>${category.range}</small>
                         </div>
 
-                        <table style="margin:0 auto;border-collapse:collapse;color:white;">
-                            ${timesHTML}
+                        <div style="max-height:280px; overflow-y:auto; width:100%;">
+                            <table style="margin:0 auto;border-collapse:collapse;color:white;">
+                                ${timesHTML}
+                            </table>
+                        </div>
+                        <table style="margin:6px auto 0 auto;border-collapse:collapse;color:white;">
                             <tr style="border-top:1px solid rgba(255,255,255,0.2);">
                                 <th style="padding-top:8px;text-align:left;">Average</th>
                                 <th style="padding-top:8px; text-align:right; padding-left:20px;">${results.average} ms</th>

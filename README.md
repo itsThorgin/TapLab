@@ -151,16 +151,16 @@ Not every drill has a rank, on purpose. Because.
 
 ## FAQ
 
-**Q: My reaction time seems worse than my pride allows.**
+**Q: My reaction time seems worse than my pride allows.**  
 A: Pride is not a timing function. Monitors, mice, browsers, and human hands all add latency. Compare yourself to yourself over time.
 
-**Q: Why orange for baits?**
+**Q: Why orange for baits?**  
 A: Because it looks friendly and then ruins your day, idk.
 
-**Q: I clicked the lit quadrant but it said I missed / clicked wrong?**
+**Q: I clicked the lit quadrant but it said I missed / clicked wrong?**  
 A: You were probably a hair too slow - the highlight expired and your in flight click landed on the next one. That's the drill working, not the drill lying. Scoring is strict to the speed you picked, but the highlight can visually linger a frame more, tho I don't think I ever saw this happen.
 
-**Q: Does this make me better in games?**
+**Q: Does this make me better in games?**  
 A: It can improve speed, consistency and awareness. You still need aim practice, VOD review, game sense, and to stop peeking mid reload.
 
 > Tip: Git gud

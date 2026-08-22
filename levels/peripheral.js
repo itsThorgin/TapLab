@@ -1,32 +1,33 @@
 window.peripheral = {
-  // configurable defaults (overridden by saved settings)
+  // Define defaults. Saved settings can replace these values.
   rounds: 10,
-  trueTargetSize: 6,           // 3 | 6 | 9 px
+  trueTargetSize: 6,           // Use 3, 6, or 9 pixels.
   distractorCount: 12,
-  distractorMin: 3,            // size px
+  distractorMin: 3,            // Set the minimum distractor size in pixels.
   distractorMax: 30,
 
-  // runtime state
+  // Store the runtime state.
   currentRound: 0,
-  times: [],                   // ms (null if mistake)
-  mistakes: [],                // boolean per round
+  times: [],                   // Store milliseconds. Use null after a mistake.
+  mistakes: [],                // Store the mistake state for each round.
   targetQuadrant: null,
   spawnTime: 0,
   endCallback: null,
   gameActive: false,
   timeoutIds: [],
   inCountdown: false,
-  roundReady: false,     // stops clicks until target is active
-  uniformColor: false,   // all dots same color + true target blinks 3x for peripheral round
+  roundReady: false,     // Block clicks until the target is active.
+  uniformColor: false,   // Use one dot color. Blink the true target three times.
   isOfficial: false,
   OFFICIAL: { rounds: 25, trueTargetSize: 3, distractorCount: 50, uniformColor: true },
   officialLabel: "Official: 25 rounds, 3px target, 50 distractors, uniform color",
 
   init(endCallback) {
-    const saved = JSON.parse(localStorage.getItem('peripheral_settings') || '{}');
+    const saved = window.readStoredJSON('peripheral_settings', {});
     this.rounds = Number.isFinite(saved.rounds) ? saved.rounds : this.rounds;
     this.trueTargetSize = [3,6,9].includes(saved.trueTargetSize) ? saved.trueTargetSize : this.trueTargetSize;
     this.distractorCount= Number.isFinite(saved.distractorCount) ? saved.distractorCount : this.distractorCount;
+    this.uniformColor = !!saved.uniformColor;
 
     this.endCallback = endCallback;
     this.currentRound = 0;
@@ -38,33 +39,23 @@ window.peripheral = {
 
     this.renderSettingsPanel();
     this.showInstruction();
-
-    this.uniformColor = !!saved.uniformColor;
   },
 
   renderSettingsPanel() {
     const panel = document.getElementById('level-specific-settings');
-    panel.innerHTML = `
-      <label>Rounds:
-        <input type="number" id="periph-rounds" min="5" max="50" value="${this.rounds}">
-      </label><br><br>
-      <label>True target size:
-        <select id="periph-size">
-          <option value="3" ${this.trueTargetSize===3?'selected':''}>3 px</option>
-          <option value="6" ${this.trueTargetSize===6?'selected':''}>6 px</option>
-          <option value="9" ${this.trueTargetSize===9?'selected':''}>9 px</option>
-        </select>
-      </label><br><br>
-      <label>Distractors:
-        <input type="number" id="periph-distractors" min="10" max="50" value="${this.distractorCount}">
-      </label><br><br>
-      <label>
-        <input type="checkbox" id="periph-uniform" ${this.uniformColor ? 'checked' : ''}>
-        Same color mode (true target blinks)
-      </label><br><br>
-      <button style="border:1px solid #0A0A23;" onclick="window.peripheral.saveSettings()">Save Settings</button>
-      <button style="margin-left:6px;border:1px solid #0A0A23;" onclick="window.peripheral.showHistory()">View History</button>
-    `;
+    panel.innerHTML = window.renderLevelSettings({
+      fields: [
+        { type: 'number', id: 'periph-rounds', label: 'Rounds', note: 'Choose from 5 to 50', min: 5, max: 50, value: this.rounds },
+        {
+          type: 'select', id: 'periph-size', label: 'True target size', note: 'Tiny targets demand more peripheral precision',
+          options: [3, 6, 9].map(size => ({ value: size, label: `${size} px`, selected: this.trueTargetSize === size }))
+        },
+        { type: 'number', id: 'periph-distractors', label: 'Distractors', note: 'Choose from 10 to 50', min: 10, max: 50, value: this.distractorCount },
+        { type: 'checkbox', id: 'periph-uniform', label: 'Same color mode', note: 'The true target blinks three times', checked: this.uniformColor }
+      ],
+      saveAction: 'window.peripheral.saveSettings()',
+      historyAction: 'window.peripheral.showHistory()'
+    });
   },
 
   saveSettings() {
@@ -91,27 +82,29 @@ window.peripheral = {
   showInstruction() {
     const container = document.getElementById('game-container');
     container.classList.remove('hidden');
-    container.innerHTML = `
-      <div style="text-align:center;max-width:600px;margin:auto;">
-        <h2>Peripheral Awareness</h2>
-        <p>
-          Keep your eyes on the <strong>center point</strong>. A tiny target will appear in one quadrant.<br>
-          <em>Do not chase it with your eyes</em><br>
-          Click the <strong>quadrant</strong> (UL / UR / LL / LR) where it appeared.<br>
-          Tracks reaction time from spawn to click and your mistakes.<br>
-          ${this.rounds} rounds total.
-        </p>
-        <div style="display:flex; gap:10px; justify-content:center;">
-          <button onclick="window.peripheral.isOfficial=false;window.peripheral.startGame()">Start</button>
-          <button onclick="window.peripheral.startOfficial()">Start Official</button>
-          <button onclick="window.peripheral.returnToMenu()">Back to Menu</button>
-        </div>
-        <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
-      </div>
-    `;
+    container.innerHTML = window.renderInstructionScreen({
+      drillName: 'Peripheral Awareness',
+      summary: 'Locate a tiny target without moving your gaze away from the center.',
+      steps: [
+        'Keep your eyes fixed on the center point.',
+        'Detect the tiny target using peripheral vision; do not chase it with your eyes.',
+        'Click the quadrant where it appeared: UL, UR, LL, or LR.'
+      ],
+      setup: [
+        { label: 'Rounds', value: this.rounds },
+        { label: 'Target size', value: `${this.trueTargetSize} px` },
+        { label: 'Distractors', value: this.distractorCount },
+        { label: 'Color mode', value: this.uniformColor ? 'Same color' : 'Color contrast' }
+      ],
+      note: 'Reaction time is recorded from target appearance to quadrant click. Wrong quadrants count as mistakes.',
+      officialLabel: this.officialLabel,
+      startAction: 'window.peripheral.isOfficial=false;window.peripheral.startGame()',
+      officialAction: 'window.peripheral.startOfficial()',
+      backAction: 'window.peripheral.returnToMenu()'
+    });
   },
 
-  // load the fixed official preset (bypasses saved settings) and start.
+  // Apply the fixed official preset. Do not use saved settings.
   startOfficial() {
     this.isOfficial = true;
     this.rounds = this.OFFICIAL.rounds;
@@ -122,6 +115,7 @@ window.peripheral = {
   },
 
   startGame() {
+    window.lockSettingsForRun();
     this.currentRound = 0;
     this.times = [];
     this.mistakes = [];
@@ -129,33 +123,29 @@ window.peripheral = {
     this.timeoutIds = [];
     this.gameActive = true;
     
-    // build the arena UI
+    // Build the arena interface.
     const container = document.getElementById('game-container');
-    container.innerHTML = `
-      <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-      <div style="text-align:center; margin-top:40px;">
-        <h3>Round ${this.currentRound + 1} of ${this.rounds}</h3>
-        <div id="peripheral-area" style="
-          position:relative; width:60vw; aspect-ratio:16/9;
-          background:#6c757d; border-radius:8px; overflow:hidden; margin:auto;
-        "></div>
-        <div style="margin-top:10px; opacity:0.8; font-size:0.9em;">
-          Click the quadrant where the tiny target appears. Keep your eyes on the center.
-        </div>
-      </div>
-    `;
-    document.getElementById('back-btn').onclick = () => this.returnToMenu();
+    container.innerHTML = window.renderGameScreen({
+      drillName: 'Peripheral Awareness',
+      mode: this.isOfficial ? 'Official' : 'Custom',
+      progressLabel: 'Round',
+      progressCurrent: this.currentRound + 1,
+      progressTotal: this.rounds,
+      stageHTML: '<div id="peripheral-area" class="game-arena game-arena-wide"></div>',
+      hint: 'Keep your gaze on the center, then click the quadrant containing the tiny target.',
+      backAction: 'window.peripheral.returnToMenu()'
+    });
 
     const area = document.getElementById('peripheral-area');
 
-    // crosshair quadrants
+    // Draw the crosshair quadrants.
     const hLine = document.createElement('div');
     hLine.style.cssText = `position:absolute; left:0; top:50%; width:100%; height:2px; background:rgba(255,255,255,0.35); transform:translateY(-1px);`;
     const vLine = document.createElement('div');
     vLine.style.cssText = `position:absolute; top:0; left:50%; height:100%; width:2px; background:rgba(255,255,255,0.35); transform:translateX(-1px);`;
     area.appendChild(hLine); area.appendChild(vLine);
 
-    // center fixation dot
+    // Draw the center fixation dot.
     const centerDot = document.createElement('div');
     centerDot.style.cssText = `
       position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -163,7 +153,7 @@ window.peripheral = {
     `;
     area.appendChild(centerDot);
 
-    // quadrant overlays (to click targets)
+    // Add a click surface to each quadrant.
     const quads = [
       { key: 'UL', left: 0,   top: 0 },
       { key: 'UR', left: 50,  top: 0 },
@@ -185,7 +175,7 @@ window.peripheral = {
       `;
       Q.appendChild(label);
 
-      Q.addEventListener('mousedown', (e) => {
+      window.onPrimaryPointerDown(Q, (e) => {
         e.stopPropagation();
         if (!this.gameActive || this.inCountdown) return;
         const clicked = e.currentTarget.dataset.quadrant;
@@ -195,10 +185,10 @@ window.peripheral = {
       area.appendChild(Q);
     });
 
-    // distractors
+    // Draw the distractors.
     this.placeDistractors(area);
 
-    // countdown, then first spawn
+    // Show the countdown. Then show the first target.
     this.inCountdown = true;
     window.show321(area, 500).then(() => {
       this.inCountdown = false;
@@ -211,31 +201,27 @@ window.peripheral = {
     this.roundReady = false;
 
     const container = document.getElementById('game-container');
-    container.innerHTML = `
-      <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-      <div style="text-align:center; margin-top:40px;">
-        <h3>Round ${this.currentRound + 1} of ${this.rounds}</h3>
-        <div id="peripheral-area" style="
-          position:relative; width:60vw; aspect-ratio:16/9;
-          background:#6c757d; border-radius:8px; overflow:hidden; margin:auto;
-        "></div>
-        <div style="margin-top:10px; opacity:0.8; font-size:0.9em;">
-          Click the quadrant where the tiny target appears. Keep your eyes on the center.
-        </div>
-      </div>
-    `;
-    document.getElementById('back-btn').onclick = () => this.returnToMenu();
+    container.innerHTML = window.renderGameScreen({
+      drillName: 'Peripheral Awareness',
+      mode: this.isOfficial ? 'Official' : 'Custom',
+      progressLabel: 'Round',
+      progressCurrent: this.currentRound + 1,
+      progressTotal: this.rounds,
+      stageHTML: '<div id="peripheral-area" class="game-arena game-arena-wide"></div>',
+      hint: 'Keep your gaze on the center, then click the quadrant containing the tiny target.',
+      backAction: 'window.peripheral.returnToMenu()'
+    });
 
     const area = document.getElementById('peripheral-area');
 
-    // crosshair quadrants
+    // Draw the crosshair quadrants.
     const hLine = document.createElement('div');
     hLine.style.cssText = `position:absolute; left:0; top:50%; width:100%; height:2px; background:rgba(255,255,255,0.35); transform:translateY(-1px);`;
     const vLine = document.createElement('div');
     vLine.style.cssText = `position:absolute; top:0;left:50%; height:100%; width:2px; background:rgba(255,255,255,0.35); transform:translateX(-1px);`;
     area.appendChild(hLine); area.appendChild(vLine);
 
-    // center fixation dot
+    // Draw the center fixation dot.
     const centerDot = document.createElement('div');
     centerDot.style.cssText = `
       position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -243,7 +229,7 @@ window.peripheral = {
     `;
     area.appendChild(centerDot);
 
-    // quadrant overlays (to click targets)
+    // Add a click surface to each quadrant.
     const quads = [
       { key: 'UL', left: 0,   top: 0 },
       { key: 'UR', left: 50,  top: 0 },
@@ -265,7 +251,7 @@ window.peripheral = {
       `;
       Q.appendChild(label);
 
-      Q.addEventListener('mousedown', (e) => {
+      window.onPrimaryPointerDown(Q, (e) => {
         e.stopPropagation();
         if (!this.gameActive || this.inCountdown) return;
         const clicked = e.currentTarget.dataset.quadrant;
@@ -275,10 +261,10 @@ window.peripheral = {
       area.appendChild(Q);
     });
 
-    // distractors
+    // Draw the distractors.
     this.placeDistractors(area);
 
-    // little countdown before spawning
+    // Show a short countdown before the target appears.
     setTimeout(() => this.spawnTrueTarget(area), 400);
   },
 
@@ -288,11 +274,11 @@ window.peripheral = {
     const w = area.clientWidth;
     const h = area.clientHeight;
 
-    // pick quadrant
+    // Select a quadrant.
     const quadrants = ['UL','UR','LL','LR'];
     this.targetQuadrant = quadrants[Math.floor(Math.random() * 4)];
 
-    // compute bounds for target within chosen quadrant (+ padding)
+    // Calculate the target limits inside the selected quadrant. Include padding.
     const pad = Math.max(12, this.trueTargetSize + 8);
     const halfW = w / 2, halfH = h / 2;
 
@@ -304,7 +290,7 @@ window.peripheral = {
       default: minX = halfW + pad; maxX = w - pad; minY = halfH + pad; maxY = h - pad; break;
     }
 
-    // pick a spot that doesn't overlap any distractor
+    // Select a position that does not overlap a distractor.
     let x, y, tries = 0;
     const tr = this.trueTargetSize / 2;
     const blockers = this._distractors || [];
@@ -312,7 +298,7 @@ window.peripheral = {
       x = minX + Math.random() * Math.max(1, (maxX - minX));
       y = minY + Math.random() * Math.max(1, (maxY - minY));
       tries++;
-      // must not overlap any distractor (with 4px buffer)
+      // Keep 4 pixels between the target and each distractor.
       var ok = true;
       for (const d of blockers) {
         const dx = x - d.x, dy = y - d.y;
@@ -320,7 +306,7 @@ window.peripheral = {
       }
     } while (!ok && tries < 80);
 
-    // true target dot
+    // Draw the true target dot.
     const trueColor = '#2ec4b6';
     const dot = document.createElement('div');
     dot.style.cssText = `
@@ -331,17 +317,17 @@ window.peripheral = {
     `;
     area.appendChild(dot);
 
-    // IMPORTANT: clicks are not valid yet
+    // Keep clicks disabled until the target is active.
     this.roundReady = false;
 
     if (this.uniformColor) {
-      // start timing and accept clicks immediately
+      // Start the timer and accept clicks immediately.
       requestAnimationFrame(() => {
         this.spawnTime = performance.now();
-        this.roundReady = true;   // allows clicks during blinking
+        this.roundReady = true;   // Accept clicks while the target blinks.
       });
 
-      // blink the target 3x, then make the round active
+      // Blink the target three times. Then make the round active.
       const blinks = 3, interval = 140;
       let toggles = 0;
       const blinkTimer = setInterval(() => {
@@ -353,7 +339,7 @@ window.peripheral = {
         }
       }, interval);
     } else {
-      // normal mode: ready immediately after paint
+      // In normal mode, accept clicks after the browser paints the target.
       requestAnimationFrame(() => {
         this.spawnTime = performance.now();
         this.roundReady = true;
@@ -363,9 +349,9 @@ window.peripheral = {
 
   handleQuadrantClick(clickedQuadrant) {
     if (!this.gameActive) return;
-    if (!this.roundReady) return; // ignore early clicking
+    if (!this.roundReady) return; // Ignore early clicks.
 
-    this.roundReady = false; // blocks other clicks until next round
+    this.roundReady = false; // Block other clicks until the next round.
 
     const rt = Math.round(performance.now() - this.spawnTime);
     const correct = clickedQuadrant === this.targetQuadrant;
@@ -373,17 +359,23 @@ window.peripheral = {
     if (correct) {
       this.times.push(rt);
       this.mistakes.push(false);
+      window.showGameFeedback({
+        type: 'success',
+        message: `Correct • ${rt} ms`,
+        duration: 340,
+        pulseTarget: '#peripheral-area'
+      });
     } else {
-      this.times.push(null);      // no reaction time for mistake
+      this.times.push(null);      // Do not record a reaction time after a mistake.
       this.mistakes.push(true);
-      this.showTemporaryMessage('Wrong segment!', '#ff4d4d');
+      this.showTemporaryMessage('Wrong quadrant', 'error');
     }
 
     this.currentRound++;
     if (this.currentRound >= this.rounds) {
       this.finish();
     } else {
-      // brief pause to reduce accidental double click
+      // Use a short pause to reduce accidental double clicks.
       this.timeoutIds.push(setTimeout(() => this.startRound(), 400));
     }
   },
@@ -409,14 +401,14 @@ window.peripheral = {
         const x = pad + r + Math.random() * (w - 2*(pad + r));
         const y = pad + r + Math.random() * (h - 2*(pad + r));
 
-        // avoid center 30px radius
+        // Keep the distractor outside a 30-pixel radius around the center.
         const dxC = x - w/2, dyC = y - h/2;
         if ((dxC*dxC + dyC*dyC) < (30*30)) continue;
 
-        // avoid crossing the 2px lines a bit
+        // Keep the distractor away from the crosshair lines.
         if (Math.abs(x - w/2) < (r + 6) || Math.abs(y - h/2) < (r + 6)) continue;
 
-        // no overlap with previous
+        // Prevent overlap with earlier distractors.
         let ok = true;
         for (const d of dots) {
           const dx = x - d.x, dy = y - d.y;
@@ -424,7 +416,7 @@ window.peripheral = {
         }
         if (!ok) continue;
 
-        // place
+        // Place the distractor.
         const dot = document.createElement('div');
         dot.style.cssText = `
           position:absolute; left:${x - r}px;top:${y - r}px;
@@ -436,7 +428,7 @@ window.peripheral = {
         placed = true;
       }
 
-      if (!placed && i < maxAttempts) continue; // just skip if overcrowded
+      if (!placed && i < maxAttempts) continue; // Skip this distractor if the arena is too crowded.
     }
     this._distractors = dots;
   },
@@ -448,9 +440,9 @@ window.peripheral = {
     const mistakesTotal = this.mistakes.filter(Boolean).length;
 
     const results = {
-      times: this.times,    // per round ms or null
-      mistakes: this.mistakes,    // per round bool
-      average: avg,   // null if no correct rounds
+      times: this.times,    // Store milliseconds for each round, or null.
+      mistakes: this.mistakes,    // Store the mistake state for each round.
+      average: avg,   // Use null when no round is correct.
       mistakesTotal,
       rounds: this.rounds,
       official: this.isOfficial,
@@ -460,25 +452,41 @@ window.peripheral = {
     this.showResultsOverlay(results);
     this.endCallback(results);
 
-    // history
-    const history = JSON.parse(localStorage.getItem('peripheral_history') || '[]');
-    history.push({
+    // Add the result to history.
+    const historyEntry = {
       date: new Date().toLocaleString(),
       rounds: this.rounds,
       trueTargetSize: this.trueTargetSize,
       distractorCount: this.distractorCount,
+      uniformColor: this.uniformColor,
       average: avg,
       mistakesTotal,
       times: this.times,
       official: this.isOfficial
+    };
+    window.appendHistory('peripheral_history', historyEntry, {
+      config: h => ({
+        official: !!h.official,
+        rounds: h.rounds,
+        trueTargetSize: h.trueTargetSize,
+        distractorCount: h.distractorCount,
+        uniformColor: h.official ? true : (typeof h.uniformColor === 'boolean' ? h.uniformColor : null)
+      }),
+      label: h => {
+        const uniform = h.official ? true : h.uniformColor;
+        const mode = typeof uniform === 'boolean' ? (uniform ? 'same color' : 'color contrast') : 'legacy color mode';
+        return `${h.official ? '★ Official' : 'Custom'} • ${h.rounds}r • ${h.trueTargetSize}px • ${h.distractorCount} distractors • ${mode}`;
+      },
+      metrics: {
+        average: h => Number.isFinite(h.average) ? h.average : null,
+        mistakesTotal: h => Number.isFinite(h.mistakesTotal) ? h.mistakesTotal : null
+      }
     });
-    localStorage.setItem('peripheral_history', JSON.stringify(history));
   },
 
   showResultsOverlay(results) {
     const container = document.getElementById('game-container');
-
-    // per round table (correct / wrong / missed)
+    const correctCount = results.times.filter(Number.isFinite).length;
     const labels = results.times.map((t, i) => {
       if (results.mistakes[i]) return 'wrong';
       if (!Number.isFinite(t)) return 'missed';
@@ -491,49 +499,60 @@ window.peripheral = {
       return `<tr><td>${i + 1}</td><td style="color:${color};">${tdisp}</td><td>${L}</td></tr>`;
     }).join('');
 
-    container.innerHTML = `
-      <div style="text-align:center;color:#e0e1dd; max-width:560px; margin:auto;">
-        <h2>Peripheral Awareness${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
-        <table style="margin:8px auto 10px auto;border-collapse:collapse;color:white;">
-          <tr><td style="text-align:left;">Avg reaction (correct)</td>
-              <td style="text-align:right;padding-left:24px;">${results.average !== null ? results.average + ' ms' : '-'}</td></tr>
-          <tr><td style="text-align:left;">Mistakes</td>
-              <td style="text-align:right;padding-left:24px;">${results.mistakesTotal}</td></tr>
-          <tr><td style="text-align:left;">Rounds</td>
-              <td style="text-align:right;padding-left:24px;">${results.rounds}</td></tr>
-        </table>
-        <div style="max-height:300px; overflow-y:auto;">
-          <table class="results-table" style="margin:0 auto;">
-            <tr><th>#</th><th>Reaction</th><th>Label</th></tr>
-            ${rows}
-          </table>
-        </div>
-        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-          <button onclick="window.peripheral.startGame()">Restart</button>
-          <button onclick="returnToMenu()">Back to Menu</button>
-        </div>
-      </div>
-    `;
+    container.innerHTML = window.renderResultScreen({
+      drillName: 'Peripheral Awareness',
+      official: results.official,
+      primary: {
+        label: 'Average correct reaction',
+        value: results.average !== null ? `${results.average} ms` : '-',
+        hint: 'Average includes correct rounds only',
+        color: '#2ec4b6'
+      },
+      metrics: [
+        { label: 'Correct rounds', value: `${correctCount} / ${results.rounds}`, tone: correctCount === results.rounds ? 'success' : undefined },
+        { label: 'Mistakes', value: results.mistakesTotal, tone: results.mistakesTotal ? 'warning' : 'success' },
+        { label: 'Rounds', value: results.rounds }
+      ],
+      breakdown: {
+        title: 'Round breakdown',
+        headers: ['Round', 'Reaction', 'Result'],
+        rows,
+        note: 'Wrong and missed rounds are excluded from the average.'
+      },
+      restartAction: 'window.peripheral.startGame()',
+      backAction: 'returnToMenu()'
+    });
   },
 
   showHistory() {
-    const history = JSON.parse(localStorage.getItem('peripheral_history') || '[]');
+    const history = window.readStoredJSON('peripheral_history', []);
     const container = document.getElementById('game-container');
     container.classList.remove('hidden');
 
     if (!history.length) {
-      container.innerHTML = `
-        <div style="text-align:center; margin-top:20px;">
-          <h3>No history found</h3>
-          <button onclick="window.peripheral.returnToMenu()">Back</button>
-        </div>
-      `;
+      container.innerHTML = window.renderEmptyHistory({
+        drillName: 'Peripheral Awareness',
+        backAction: 'window.peripheral.returnToMenu()'
+      });
       return;
     }
 
-    const rows = history.map((h,i) => `
+    const archive = history.find(h => h && h._compacted === true);
+    const recent = history.filter(h => h && typeof h === 'object' && h._compacted !== true);
+    const historyOffset = archive ? Number(archive.sessionCount) || 0 : 0;
+    const compactedRow = window.renderCompactedHistoryRow(archive, 7, group => {
+      const reaction = window.getCompactedMetric(group, 'average');
+      const mistakes = window.getCompactedMetric(group, 'mistakesTotal');
+      return `<div class="compacted-history-group">
+        <strong>${window.escapeHTML(group.label)}</strong><br>
+        ${group.sessionCount} runs • ${reaction ? Math.round(reaction.average) + ' ms average' : 'no correct timing data'} •
+        ${mistakes ? mistakes.average.toFixed(1) : '0'} mistakes/run
+      </div>`;
+    });
+
+    const rows = recent.slice().reverse().map((h,i) => `
       <tr>
-        <td>${i+1}</td>
+        <td>${historyOffset + recent.length - i}</td>
         <td>${h.date}</td>
         <td>${h.official ? '★ Official' : '-'}</td>
         <td>${h.rounds}r / ${h.trueTargetSize}px / ${h.distractorCount} distractors</td>
@@ -543,22 +562,15 @@ window.peripheral = {
       </tr>
     `).join('');
 
-    container.innerHTML = `
-      <div style="max-width:95%; margin:auto; color:#e0e1dd;">
-        <h2 style="text-align:center;">Peripheral Awareness History</h2>
-        <div style="max-height:70vh; overflow-y:auto;">
-          <table class="results-table">
-            <tr>
-              <th>#</th><th>Date</th><th>Mode</th><th>Config</th><th>Average</th><th>Mistakes</th><th>Times</th>
-            </tr>
-            ${rows}
-          </table>
-        </div>
-        <div style="text-align:center; margin-top:10px;">
-          <button onclick="window.peripheral.returnToMenu()">Back</button>
-        </div>
-      </div>
-    `;
+    container.innerHTML = window.renderHistoryScreen({
+      drillName: 'Peripheral Awareness',
+      headers: ['#', 'Date', 'Mode', 'Config', 'Average', 'Mistakes', 'Times'],
+      rows,
+      compactedRow,
+      recentCount: recent.length,
+      archivedCount: historyOffset,
+      backAction: 'window.peripheral.returnToMenu()'
+    });
   },
 
   showPopupMessage: function(text) {
@@ -573,20 +585,13 @@ window.peripheral = {
         setTimeout(()=>msg.remove(), 1500);
     },
   
-  showTemporaryMessage(text, color = "#ff4d4d") {
-    const host = document.getElementById('game-container');
-    if (!host) return;
-    if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
-
-    const msg = document.createElement('div');
-    msg.textContent = text;
-    msg.style.cssText = `
-      position:absolute ;top:50%; left:50%; transform:translate(-50%,-50%);
-      background:rgba(0,0,0,0.6); color:${color}; padding:6px 12px; border-radius:6px;
-      font-weight:bold; z-index:1000; font-size:1.2em; pointer-events:none;
-    `;
-    host.appendChild(msg);
-    setTimeout(() => { msg.style.transition='opacity .4s'; msg.style.opacity='0'; setTimeout(()=>msg.remove(), 400); }, 1000);
+  showTemporaryMessage(text, type = "error") {
+    window.showGameFeedback({
+      type,
+      message: text,
+      duration: 380,
+      pulseTarget: '#peripheral-area'
+    });
   },
 
   returnToMenu() {
@@ -600,3 +605,6 @@ window.peripheral = {
   }
 
 };
+
+
+

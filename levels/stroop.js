@@ -1,12 +1,12 @@
 window.stroop = {
-    // settings (overridden by saved)
-    trials: 20,             // number of trials (5..50)
-    incongruentBias: 0.75,  // probability a trial is incongruent (word != ink)
+    // Define settings. Saved settings can replace these values.
+    trials: 20,             // Set the number of trials from 5 to 50.
+    incongruentBias: 0.75,  // Set the probability that the word and ink color differ.
     isOfficial: false,
     OFFICIAL: { trials: 25, incongruentBias: 0.75 },
     officialLabel: "Official: 25 trials, 75% incongruent",
 
-    // palette: 6 colors. name = the word text; hex = the ink/swatch color.
+    // Palette of colors. Use name for word text and hex for ink and swatch colors.
     palette: [
         { name: 'RED',    hex: '#e63946' },
         { name: 'GREEN',  hex: '#2ec4b6' },
@@ -16,13 +16,13 @@ window.stroop = {
         { name: 'PURPLE', hex: '#9b5de5' },
     ],
 
-    // runtime state
+    // Store the runtime state.
     currentTrial: 0,
-    times: [],              // ms per trial (only correct trials get a time; wrong = null)
-    correctFlags: [],       // bool per trial
-    congruentFlags: [],     // bool per trial (was word==ink)
-    inkIndex: null,         // index into palette for current ink color
-    wordIndex: null,        // index into palette for current word
+    times: [],              // Store milliseconds for correct trials. Use null for wrong trials.
+    correctFlags: [],       // Store the correct state for each trial.
+    congruentFlags: [],     // Store whether the word matches the ink for each trial.
+    inkIndex: null,         // Store the palette index of the current ink color.
+    wordIndex: null,        // Store the palette index of the current word.
     trialStart: 0,
     acceptingInput: false,
     endCallback: null,
@@ -30,7 +30,7 @@ window.stroop = {
     timeoutIds: [],
 
     init(endCallback) {
-        const saved = JSON.parse(localStorage.getItem('stroop_settings') || '{}');
+        const saved = window.readStoredJSON('stroop_settings', {});
         this.trials = (saved.trials >= 5 && saved.trials <= 50) ? saved.trials : 20;
         this.incongruentBias = Number.isFinite(saved.incongruentBias) ? saved.incongruentBias : 0.75;
 
@@ -45,16 +45,31 @@ window.stroop = {
 
     renderSettingsPanel() {
         const panel = document.getElementById('level-specific-settings');
-        panel.innerHTML = `
-            <label>Trials:
-                <input type="number" id="stroop-trials" min="5" max="50" value="${this.trials}">
-            </label><br><br>
-            <label>Incongruent chance:
-                <input type="number" id="stroop-bias" min="0" max="1" step="0.05" value="${this.incongruentBias}">
-            </label><br><br>
-            <button style="border:1px solid #0A0A23;" onclick="window.stroop.saveSettings()">Save Settings</button>
-            <button style="margin-left:6px;border:1px solid #0A0A23;" onclick="window.stroop.showHistory()">View History</button>
-        `;
+        panel.innerHTML = window.renderLevelSettings({
+            fields: [
+                {
+                    type: 'number',
+                    id: 'stroop-trials',
+                    label: 'Trials',
+                    note: 'Color-word decisions in one run',
+                    min: 5,
+                    max: 50,
+                    value: this.trials
+                },
+                {
+                    type: 'number',
+                    id: 'stroop-bias',
+                    label: 'Incongruent chance',
+                    note: 'Probability from 0 to 1 that word and ink conflict',
+                    min: 0,
+                    max: 1,
+                    step: 0.05,
+                    value: this.incongruentBias
+                }
+            ],
+            saveAction: 'window.stroop.saveSettings()',
+            historyAction: 'window.stroop.showHistory()'
+        });
     },
 
     saveSettings() {
@@ -73,26 +88,28 @@ window.stroop = {
     showInstruction() {
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
-        container.innerHTML = `
-            <div style="text-align:center;max-width:620px;margin:auto;">
-                <h2>Stroop Test</h2>
-                <p>
-                    A color <strong>word</strong> appears, printed in some <strong>ink color</strong>.<br>
-                    Click the swatch matching the <strong>ink color</strong> - <em>not</em> what the word says.<br>
-                    E.g. the word <span style="color:#4d9de0;font-weight:bold;">GREEN</span> printed in blue &rarr; click the <strong>blue</strong> swatch.<br>
-                    Measures reaction time and accuracy. ${this.trials} trials total.
-                </p>
-                <div style="display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.stroop.isOfficial=false;window.stroop.startGame()">Start</button>
-                    <button onclick="window.stroop.startOfficial()">Start Official</button>
-                    <button onclick="window.stroop.returnToMenu()">Back to Menu</button>
-                </div>
-                <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
-            </div>
-        `;
+        container.innerHTML = window.renderInstructionScreen({
+            drillName: 'Stroop Test',
+            summary: 'Measure selective attention and how quickly you resolve conflicting visual information.',
+            steps: [
+                'A color word appears in a colored ink.',
+                'Click the swatch that matches the ink color, not the word.',
+                'The swatches reshuffle, so identify the color before locating your response.'
+            ],
+            setup: [
+                { label: 'Trials', value: this.trials },
+                { label: 'Incongruent', value: `${Math.round(this.incongruentBias * 100)}% chance` },
+                { label: 'Measures', value: 'Speed + accuracy' }
+            ],
+            note: 'Incongruent trials create interference by making the word meaning disagree with its ink color.',
+            officialLabel: this.officialLabel,
+            startAction: 'window.stroop.isOfficial=false;window.stroop.startGame()',
+            officialAction: 'window.stroop.startOfficial()',
+            backAction: 'window.stroop.returnToMenu()'
+        });
     },
 
-    // load the fixed official preset (bypasses saved settings) and start.
+    // Apply the fixed official preset. Do not use saved settings.
     startOfficial() {
         this.isOfficial = true;
         this.trials = this.OFFICIAL.trials;
@@ -101,6 +118,7 @@ window.stroop = {
     },
 
     startGame() {
+        window.lockSettingsForRun();
         this.currentTrial = 0;
         this.times = [];
         this.correctFlags = [];
@@ -111,22 +129,24 @@ window.stroop = {
         this.gameActive = true;
 
         const container = document.getElementById('game-container');
-        container.innerHTML = `
-            <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-            <div style="text-align:center; margin-top:30px;">
-                <h3>Trial <span id="stroop-idx">1</span> / ${this.trials}</h3>
-                <div id="stroop-word-area" style="
-                    height:28vh; display:flex; align-items:center; justify-content:center;
-                    user-select:none;
-                ">
-                    <span id="stroop-word" style="font-size:5em; font-weight:bold;"></span>
+        container.innerHTML = window.renderGameScreen({
+            drillName: 'Stroop Test',
+            mode: this.isOfficial ? 'Official' : 'Custom',
+            progressLabel: 'Trial',
+            progressCurrent: 1,
+            progressTotal: this.trials,
+            progressId: 'stroop-idx',
+            stageHTML: `
+                <div class="stroop-game-stage">
+                    <div id="stroop-word-area" class="stroop-word-area">
+                        <span id="stroop-word"></span>
+                    </div>
+                    <div id="stroop-swatches" class="stroop-swatches"></div>
                 </div>
-                <div id="stroop-swatches" style="
-                    display:flex; gap:14px; flex-wrap:wrap; justify-content:center; max-width:560px; margin:10px auto 0 auto;
-                "></div>
-            </div>
-        `;
-        document.getElementById('back-btn').onclick = () => this.returnToMenu();
+            `,
+            hint: 'Respond to the ink color, not the word meaning.',
+            backAction: 'window.stroop.returnToMenu()'
+        });
 
         this.renderSwatches();
 
@@ -141,8 +161,8 @@ window.stroop = {
         const wrap = document.getElementById('stroop-swatches');
         if (!wrap) return;
         wrap.innerHTML = '';
-        // display order is shuffled so position can't be memorized
-        // but each button keeps its true palette index (for scoring)
+        // Change the display order so the player cannot memorize positions.
+        // Keep the original palette index on each button for scoring.
         const order = this.palette.map((_, i) => i);
         for (let i = order.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -157,10 +177,11 @@ window.stroop = {
                 background:${c.hex}; border:2px solid rgba(255,255,255,0.15);
                 cursor:pointer; transition:transform 0.08s;
             `;
-            sw.onmousedown = (e) => {
-                e.preventDefault();
+            sw.setAttribute('aria-label', `${c.name} color swatch`);
+            sw.tabIndex = -1;
+            window.onPrimaryPointerDown(sw, () => {
                 this.handleAnswer(paletteIndex);
-            };
+            });
             wrap.appendChild(sw);
         });
     },
@@ -168,15 +189,18 @@ window.stroop = {
     nextTrial() {
         if (!this.gameActive) return;
         if (this.currentTrial >= this.trials) { this.finish(); return; }
+        window.clearGameFeedback();
+        this.acceptingInput = false;
+        const trialIndex = this.currentTrial;
 
         const n = this.palette.length;
-        // pick the ink color
+        // Select the ink color.
         this.inkIndex = Math.floor(Math.random() * n);
 
-        // decide congruent or incongruent
+        // Select whether the word and ink color match.
         const incongruent = Math.random() < this.incongruentBias;
         if (incongruent) {
-            // word is a different color name than the ink
+            // Select a color word that differs from the ink color.
             let w;
             do { w = Math.floor(Math.random() * n); } while (w === this.inkIndex);
             this.wordIndex = w;
@@ -185,7 +209,7 @@ window.stroop = {
         }
         this.congruentFlags[this.currentTrial] = !incongruent;
 
-        // render the word
+        // Display the word.
         const wordEl = document.getElementById('stroop-word');
         const idxEl = document.getElementById('stroop-idx');
         if (idxEl) idxEl.textContent = this.currentTrial + 1;
@@ -194,8 +218,11 @@ window.stroop = {
             wordEl.style.color = this.palette[this.inkIndex].hex;
         }
 
-        this.trialStart = performance.now();
-        this.acceptingInput = true;
+        requestAnimationFrame(() => {
+            if (!this.gameActive || this.currentTrial !== trialIndex || !wordEl || !wordEl.isConnected) return;
+            this.trialStart = performance.now();
+            this.acceptingInput = true;
+        });
     },
 
     handleAnswer(swatchIndex) {
@@ -207,14 +234,14 @@ window.stroop = {
         this.correctFlags[this.currentTrial] = correct;
         this.times[this.currentTrial] = correct ? rt : null;
 
-        // visual feedback on the word area
+        // Show visual feedback in the word area.
         this.flashFeedback(correct);
 
-        // shuffle swatch positions after a correct answer so position can't be memorized
+        // Move the swatches after a correct answer so the player cannot memorize positions.
         if (correct) this.renderSwatches();
 
         this.currentTrial++;
-        const delay = correct ? 250 : 500; // linger a touch longer on a mistake
+        const delay = correct ? 250 : 500; // Show feedback longer after a mistake.
         const id = setTimeout(() => {
             if (this.currentTrial >= this.trials) this.finish();
             else this.nextTrial();
@@ -223,16 +250,14 @@ window.stroop = {
     },
 
     flashFeedback(correct) {
-        const wordEl = document.getElementById('stroop-word');
-        if (!wordEl) return;
-        // brief tint behind the word: green for correct, red for wrong
         const area = document.getElementById('stroop-word-area');
-        if (area) {
-            area.style.transition = 'background 0.1s';
-            area.style.background = correct ? 'rgba(46,196,182,0.18)' : 'rgba(230,57,70,0.22)';
-            const id = setTimeout(() => { if (area) area.style.background = 'transparent'; }, 200);
-            this.timeoutIds.push(id);
-        }
+        if (!area) return;
+        window.showGameFeedback({
+            type: correct ? 'success' : 'error',
+            message: correct ? 'Correct' : 'Incorrect',
+            duration: correct ? 220 : 420,
+            pulseTarget: area
+        });
     },
 
     finish() {
@@ -242,7 +267,8 @@ window.stroop = {
         const correctCount = this.correctFlags.filter(Boolean).length;
         const accuracy = this.trials ? Math.round((correctCount / this.trials) * 100) : 0;
 
-        // stroop interference: avg incongruent RT - avg congruent RT (correct trials only)
+        // Calculate Stroop interference from correct trials.
+        // Subtract the average matching trial time from the average different trial time.
         const congTimes = [], incongTimes = [];
         this.times.forEach((t, i) => {
             if (!Number.isFinite(t)) return;
@@ -259,6 +285,9 @@ window.stroop = {
             avgCongruent: avgCong,
             avgIncongruent: avgIncong,
             interference,
+            times: this.times,
+            correctFlags: this.correctFlags,
+            congruentFlags: this.congruentFlags,
             official: this.isOfficial,
             _customOverlay: true
         };
@@ -266,20 +295,36 @@ window.stroop = {
         this.showResultsOverlay(results);
         this.endCallback(results);
 
-        const history = JSON.parse(localStorage.getItem('stroop_history') || '[]');
-        history.push({
+        const historyEntry = {
             date: new Date().toLocaleString(),
             trials: this.trials,
+            incongruentBias: this.incongruentBias,
             average: avg,
             accuracy,
             interference,
             official: this.isOfficial
+        };
+        window.appendHistory('stroop_history', historyEntry, {
+            config: h => ({
+                official: !!h.official,
+                trials: h.trials,
+                incongruentBias: h.official ? 0.75 : (Number.isFinite(h.incongruentBias) ? h.incongruentBias : null)
+            }),
+            label: h => {
+                const bias = h.official ? 0.75 : h.incongruentBias;
+                const biasLabel = Number.isFinite(bias) ? `${Math.round(bias * 100)}% incongruent` : 'legacy incongruent setting';
+                return `${h.official ? '★ Official' : 'Custom'} • ${h.trials} trials • ${biasLabel}`;
+            },
+            metrics: {
+                average: h => Number.isFinite(h.average) ? h.average : null,
+                accuracy: h => Number.isFinite(h.accuracy) ? h.accuracy : null,
+                interference: h => Number.isFinite(h.interference) ? h.interference : null
+            }
         });
-        localStorage.setItem('stroop_history', JSON.stringify(history));
     },
 
-    // factual interpretation of the interference score
-    // healthy adult interference is typically 50-200 ms (research documented)
+    // Interpret the interference score with reference ranges.
+    // Use 50 to 200 milliseconds as the typical range for healthy adults.
     interferenceBand(ms) {
         if (ms === null || ms === undefined) return { text: "-", color: "#e0e1dd" };
         if (ms < 0)    return { text: `${ms} ms - unusual (faster on incongruent; likely noise or low trial count)`, color: "#ffd166" };
@@ -291,41 +336,56 @@ window.stroop = {
     showResultsOverlay(results) {
         const container = document.getElementById('game-container');
         const interf = this.interferenceBand(results.interference);
+        const formatMs = value => Number.isFinite(value) ? `${value} ms` : '-';
+        let interpretationTitle = 'Insufficient data';
+        if (results.interference !== null) {
+            if (results.interference < 0) interpretationTitle = 'Unusual result';
+            else if (results.interference < 50) interpretationTitle = 'Minimal interference';
+            else if (results.interference <= 200) interpretationTitle = 'Typical range';
+            else interpretationTitle = 'Elevated interference';
+        }
+        const rows = results.times.map((time, index) => {
+            const correct = !!results.correctFlags[index];
+            return `<tr>
+                <td>${index + 1}</td>
+                <td>${results.congruentFlags[index] ? 'Congruent' : 'Incongruent'}</td>
+                <td>${formatMs(time)}</td>
+                <td><span class="result-status ${correct ? 'result-status-success' : 'result-status-danger'}">${correct ? 'Correct' : 'Wrong'}</span></td>
+            </tr>`;
+        }).join('');
 
-        container.innerHTML = `
-            <div style="text-align:center;color:#e0e1dd; max-width:560px; margin:auto;">
-                <h2>Stroop Test${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
-
-                <div style="margin:10px auto; padding:10px 14px; border-radius:10px;
-                            background:rgba(255,255,255,0.05); max-width:440px;">
-                    <div style="font-size:0.95em; opacity:0.85;">Stroop interference</div>
-                    <div style="font-size:1.15em; font-weight:bold; color:${interf.color}; margin-top:2px;">
-                        ${interf.text}
-                    </div>
-                    <div style="font-size:0.8em; opacity:0.7; margin-top:4px;">
-                        (extra time incongruent trials cost vs congruent - the core Stroop measure)
-                    </div>
-                </div>
-
-                <table style="margin:8px auto 0 auto;border-collapse:collapse;color:white;">
-                    <tr><td style="text-align:left;">Trials</td>
-                        <td style="text-align:right;padding-left:24px;">${results.trials}</td></tr>
-                    <tr><td style="text-align:left;">Accuracy</td>
-                        <td style="text-align:right;padding-left:24px;">${results.accuracy}%</td></tr>
-                    <tr><td style="text-align:left;">Avg reaction</td>
-                        <td style="text-align:right;padding-left:24px;">${results.average !== null ? results.average + ' ms' : '-'}</td></tr>
-                    <tr><td style="text-align:left;">Avg congruent</td>
-                        <td style="text-align:right;padding-left:24px;">${results.avgCongruent !== null ? results.avgCongruent + ' ms' : '-'}</td></tr>
-                    <tr><td style="text-align:left;">Avg incongruent</td>
-                        <td style="text-align:right;padding-left:24px;">${results.avgIncongruent !== null ? results.avgIncongruent + ' ms' : '-'}</td></tr>
-                </table>
-
-                <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.stroop.restartGame()">Restart</button>
-                    <button onclick="returnToMenu()">Back to Menu</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderResultScreen({
+            drillName: 'Stroop Test',
+            official: results.official,
+            primary: {
+                label: 'Stroop interference',
+                value: formatMs(results.interference),
+                hint: 'Incongruent average minus congruent average',
+                color: interf.color
+            },
+            metrics: [
+                { label: 'Accuracy', value: `${results.accuracy}%`, tone: results.accuracy >= 90 ? 'success' : 'warning' },
+                { label: 'Avg reaction', value: formatMs(results.average) },
+                { label: 'Avg congruent', value: formatMs(results.avgCongruent) },
+                { label: 'Avg incongruent', value: formatMs(results.avgIncongruent) },
+                { label: 'Trials', value: results.trials }
+            ],
+            assessment: {
+                eyebrow: 'Reference interpretation',
+                title: interpretationTitle,
+                description: interf.text,
+                color: interf.color,
+                footer: 'This is a reference interpretation, not a competitive rank.'
+            },
+            breakdown: {
+                title: 'Trial breakdown',
+                headers: ['Trial', 'Type', 'Reaction', 'Result'],
+                rows,
+                note: 'Reaction time is retained for correct answers only.'
+            },
+            restartAction: 'window.stroop.restartGame()',
+            backAction: 'returnToMenu()'
+        });
     },
 
     restartGame() {
@@ -336,21 +396,34 @@ window.stroop = {
     },
 
     showHistory() {
-        const history = JSON.parse(localStorage.getItem('stroop_history') || '[]');
+        const history = window.readStoredJSON('stroop_history', []);
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
 
         if (!history.length) {
-            container.innerHTML = `
-                <div style="text-align:center; margin-top:20px;">
-                    <h3>No history found</h3>
-                    <button onclick="window.stroop.showInstruction()">Back</button>
-                </div>
-            `;
+            container.innerHTML = window.renderEmptyHistory({
+                drillName: 'Stroop Test',
+                backAction: 'window.stroop.showInstruction()'
+            });
             return;
         }
 
-        const rows = history.slice().reverse().map(h => `
+        const archive = history.find(h => h && h._compacted === true);
+        const recent = history.filter(h => h && typeof h === 'object' && h._compacted !== true);
+        const archivedCount = archive ? Number(archive.sessionCount) || 0 : 0;
+        const compactedRow = window.renderCompactedHistoryRow(archive, 6, group => {
+            const reaction = window.getCompactedMetric(group, 'average');
+            const accuracy = window.getCompactedMetric(group, 'accuracy');
+            const interference = window.getCompactedMetric(group, 'interference');
+            return `<div class="compacted-history-group">
+                <strong>${window.escapeHTML(group.label)}</strong><br>
+                ${group.sessionCount} runs • ${reaction ? Math.round(reaction.average) + ' ms average / ' + Math.round(reaction.min) + ' ms best' : '-'} •
+                ${accuracy ? accuracy.average.toFixed(1) + '% accuracy' : '-'} •
+                ${interference ? Math.round(interference.average) + ' ms interference' : '-'}
+            </div>`;
+        });
+
+        const rows = recent.slice().reverse().map(h => `
             <tr>
                 <td>${h.date}</td>
                 <td>${h.official ? '★ Official' : '-'}</td>
@@ -361,20 +434,15 @@ window.stroop = {
             </tr>
         `).join('');
 
-        container.innerHTML = `
-            <div style="text-align:center; max-width:780px; margin:auto;">
-                <h2>Stroop - History</h2>
-                <div style="max-height:60vh; overflow-y:auto;">
-                    <table class="results-table">
-                        <tr><th>Date</th><th>Mode</th><th>Trials</th><th>Avg RT</th><th>Accuracy</th><th>Interference</th></tr>
-                        ${rows}
-                    </table>
-                </div>
-                <div style="margin-top:14px;">
-                    <button onclick="window.stroop.showInstruction()">Back</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderHistoryScreen({
+            drillName: 'Stroop Test',
+            headers: ['Date', 'Mode', 'Trials', 'Avg RT', 'Accuracy', 'Interference'],
+            rows,
+            compactedRow,
+            recentCount: recent.length,
+            archivedCount,
+            backAction: 'window.stroop.showInstruction()'
+        });
     },
 
     showPopupMessage(text) {

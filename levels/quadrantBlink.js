@@ -1,12 +1,12 @@
 window.quadrantBlink = {
-  // settings (overridden by saved)
-  intervalsCount: 30,   // number of highlights per session
-  blinkIntervalMs: 400,   // 100-1500 step 5
+  // Settings, saved settings can replace these values.
+  intervalsCount: 30,   // Set the number of highlights in one run.
+  blinkIntervalMs: 400,   // Use 100 to 1500 milliseconds in 5 millisecond steps.
   isOfficial: false,
   OFFICIAL: { intervalsCount: 100, blinkIntervalMs: 250 },
   officialLabel: "Official: 100 intervals @ 250 ms",
 
-  // runtime state
+  // Store the runtime state.
   currentIndex: 0,
   activeQuadrant: null,
   lastQuadrant: null,
@@ -14,8 +14,8 @@ window.quadrantBlink = {
   intervalStart: 0,
   roundReady: false,
 
-  times: [],    // per interval RT | ms or null
-  labels: [],   // 'correct' | 'wrong' | 'missed'
+  times: [],    // Store the reaction time for each interval, or null.
+  labels: [],   // Use "correct", "wrong", or "missed" for each interval.
   wrongClicks: 0,
   missedIntervals: 0,
 
@@ -24,7 +24,7 @@ window.quadrantBlink = {
   timeoutIds: [],
 
   init(endCallback) {
-    const saved = JSON.parse(localStorage.getItem('quadrantBlink_settings') || '{}');
+    const saved = window.readStoredJSON('quadrantBlink_settings', {});
     this.intervalsCount  = Number.isFinite(saved.intervalsCount) ? saved.intervalsCount : this.intervalsCount;
     this.blinkIntervalMs = Number.isFinite(saved.blinkIntervalMs) ? saved.blinkIntervalMs : this.blinkIntervalMs;
 
@@ -37,17 +37,17 @@ window.quadrantBlink = {
   },
 
   resetState() {
-    // stop quadrant interval
+    // Stop the quadrant interval.
     if (this.intervalId !== null) {
       clearInterval(this.intervalId);
       this.intervalId = null;
     }
 
-    // clear any queued timeouts
+    // Clear all queued timeouts.
     this.timeoutIds.forEach(id => clearTimeout(id));
     this.timeoutIds = [];
 
-    // runtime state resets
+    // Reset the runtime state.
     this.currentIndex = 0;
     this.activeQuadrant = null;
     this.lastQuadrant = null;
@@ -65,16 +65,14 @@ window.quadrantBlink = {
 
   renderSettingsPanel() {
     const panel = document.getElementById('level-specific-settings');
-    panel.innerHTML = `
-      <label>Intervals (count):
-        <input type="number" id="qb-count" min="25" max="200" value="${this.intervalsCount}">
-      </label><br><br>
-      <label>Blink speed (ms, 100-1500, step 5):
-        <input type="number" id="qb-speed" min="100" max="1500" step="5" value="${this.blinkIntervalMs}">
-      </label><br><br>
-      <button style="border:1px solid #0A0A23;" onclick="window.quadrantBlink.saveSettings()">Save Settings</button>
-      <button style="margin-left:6px; border:1px solid #0A0A23;" onclick="window.quadrantBlink.showHistory()">View History</button>
-    `;
+    panel.innerHTML = window.renderLevelSettings({
+      fields: [
+        { type: 'number', id: 'qb-count', label: 'Intervals', note: 'Choose from 25 to 200', min: 25, max: 200, value: this.intervalsCount },
+        { type: 'number', id: 'qb-speed', label: 'Blink speed', note: '100–1500 ms in 5 ms steps', min: 100, max: 1500, step: 5, value: this.blinkIntervalMs }
+      ],
+      saveAction: 'window.quadrantBlink.saveSettings()',
+      historyAction: 'window.quadrantBlink.showHistory()'
+    });
   },
 
   saveSettings() {
@@ -95,26 +93,27 @@ window.quadrantBlink = {
   showInstruction() {
     const container = document.getElementById('game-container');
     container.classList.remove('hidden');
-    container.innerHTML = `
-      <div style="text-align:center; max-width:600px; margin:auto;">
-        <h2>Quadrant Blink</h2>
-        <p>
-          Keep your eyes on the <strong>center dot</strong>.<br>
-          One quadrant will <strong>light up</strong> every <strong>${this.blinkIntervalMs} ms</strong>.<br>
-          Click the highlighted quadrant <em>during that interval</em>.<br>
-          Tracks reaction time from highlight to correct click, misses, and wrong clicks.
-        </p>
-        <div style="display:flex; gap:10px; justify-content:center;">
-          <button onclick="window.quadrantBlink.isOfficial=false;window.quadrantBlink.startGame()">Start</button>
-          <button onclick="window.quadrantBlink.startOfficial()">Start Official</button>
-          <button onclick="window.quadrantBlink.returnToMenu()">Back to Menu</button>
-        </div>
-        <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
-      </div>
-    `;
+    container.innerHTML = window.renderInstructionScreen({
+      drillName: 'Quadrant Blink',
+      summary: 'React inside repeating attention windows while maintaining accuracy.',
+      steps: [
+        'Keep your eyes on the center dot.',
+        `A quadrant lights up every ${this.blinkIntervalMs} ms.`,
+        'Click the highlighted quadrant before that interval ends.'
+      ],
+      setup: [
+        { label: 'Intervals', value: this.intervalsCount },
+        { label: 'Blink speed', value: `${this.blinkIntervalMs} ms` }
+      ],
+      note: 'Misses and wrong clicks both count as errors. A rank requires the accuracy and consistency gate.',
+      officialLabel: this.officialLabel,
+      startAction: 'window.quadrantBlink.isOfficial=false;window.quadrantBlink.startGame()',
+      officialAction: 'window.quadrantBlink.startOfficial()',
+      backAction: 'window.quadrantBlink.returnToMenu()'
+    });
   },
 
-  // load the fixed official preset (bypasses saved settings) and start.
+  // Official preset. Do not use saved settings.
   startOfficial() {
     this.isOfficial = true;
     this.intervalsCount = this.OFFICIAL.intervalsCount;
@@ -123,41 +122,38 @@ window.quadrantBlink = {
   },
 
   startGame() {
+    window.lockSettingsForRun();
     this.resetState();
     this.gameActive = true;
 
     const container = document.getElementById('game-container');
-    container.innerHTML = `
-      <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-      <div style="text-align:center; margin-top:40px;">
-        <h3>Interval <span id="qb-idx">1</span> / ${this.intervalsCount}</h3>
-        <div id="qb-area" style="
-          position:relative; width:60vw; aspect-ratio:16/9;
-          background:#6c757d; border-radius:8px; overflow:hidden; margin:auto;
-        "></div>
-        <div style="margin-top:10px; opacity:0.8; font-size:0.9em;">
-          Click the quadrant that is highlighted. Keep fixation at the center.
-        </div>
-      </div>
-    `;
-    document.getElementById('back-btn').onclick = () => this.returnToMenu();
+    container.innerHTML = window.renderGameScreen({
+      drillName: 'Quadrant Blink',
+      mode: this.isOfficial ? 'Official' : 'Custom',
+      progressLabel: 'Interval',
+      progressCurrent: 1,
+      progressTotal: this.intervalsCount,
+      progressId: 'qb-idx',
+      stageHTML: '<div id="qb-area" class="game-arena game-arena-wide"></div>',
+      hint: 'Hold fixation at the center and click the highlighted quadrant before the interval changes.',
+      backAction: 'window.quadrantBlink.returnToMenu()'
+    });
 
     const area = document.getElementById('qb-area');
     this.setupArena(area);
 
-    // countdown then begin
     window.show321(area, 500).then(() => this.beginCadence(area));
   },
 
   setupArena(area) {
-    // crosshair quadrants
+    // Draw the crosshair quadrants.
     const hLine = document.createElement('div');
     hLine.style.cssText = `position:absolute; left:0; top:50%; width:100%; height:2px; background:rgba(255,255,255,0.35); transform:translateY(-1px);`;
     const vLine = document.createElement('div');
     vLine.style.cssText = `position:absolute; top:0; left:50%; height:100%; width:2px; background:rgba(255,255,255,0.35); transform:translateX(-1px);`;
     area.appendChild(hLine); area.appendChild(vLine);
 
-    // quadrant click surface
+    // Add the quadrant click surfaces.
     const quads = [
       { key: 'UL', left: 0,   top: 0 },
       { key: 'UR', left: 50,  top: 0 },
@@ -171,7 +167,7 @@ window.quadrantBlink = {
         position:absolute; left:${q.left}%; top:${q.top}%;
         width:50%; height:50%;
       `;
-      // quadrant label
+      // Add the quadrant label.
       const label = document.createElement('div');
       label.textContent = q.key;
       label.style.cssText = `
@@ -180,7 +176,7 @@ window.quadrantBlink = {
       `;
       Q.appendChild(label);
 
-      Q.addEventListener('mousedown', (e) => {
+      window.onPrimaryPointerDown(Q, (e) => {
         if (!this.gameActive || !this.roundReady) return;
         const clicked = e.currentTarget.dataset.quadrant;
         this.handleClick(clicked);
@@ -189,7 +185,7 @@ window.quadrantBlink = {
       area.appendChild(Q);
     });
 
-    // highlight overlays for each quadrant
+    // Add a highlight overlay to each quadrant.
     ['UL','UR','LL','LR'].forEach(k => {
       const overlay = document.createElement('div');
       overlay.id = `qb-ov-${k}`;
@@ -199,7 +195,7 @@ window.quadrantBlink = {
         transition: opacity ${Math.min(120, this.blinkIntervalMs*0.3)}ms ease;
       `;
       
-      // position
+      // Position the overlay.
       switch (k) {
         case 'UL': overlay.style.left='0%'; overlay.style.top='0%'; overlay.style.width='50%'; overlay.style.height='50%'; break;
         case 'UR': overlay.style.left='50%'; overlay.style.top='0%'; overlay.style.width='50%'; overlay.style.height='50%'; break;
@@ -209,7 +205,7 @@ window.quadrantBlink = {
       area.appendChild(overlay);
     });
 
-    // center dot
+    // Draw the center dot.
     const centerDot = document.createElement('div');
     centerDot.style.cssText = `
       position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -221,7 +217,7 @@ window.quadrantBlink = {
   beginCadence(area) {
     if (!this.gameActive) return;
     this.roundReady = false;
-    this.tick(area); // show first highlight immediately
+    this.tick(area); // Show the first highlight immediately.
 
     this.intervalId = setInterval(() => {
       this.advanceInterval(area);
@@ -229,45 +225,52 @@ window.quadrantBlink = {
   },
 
   tick(area) {
-    // choose a new quadrant different from last
+    // Select a quadrant that differs from the previous quadrant.
     const opts = ['UL','UR','LL','LR'].filter(q => q !== this.lastQuadrant);
     this.activeQuadrant = opts[Math.floor(Math.random() * opts.length)];
     this.lastQuadrant = this.activeQuadrant;
 
-    // clear previous highlights
+    // Clear the previous highlights.
     ['UL','UR','LL','LR'].forEach(k => {
       const el = document.getElementById(`qb-ov-${k}`);
       if (!el) return;
 
-      // restore prior transition if it changed during flash
+      // Restore the transition after a feedback flash changes it.
       if (el.dataset._prevTransition !== undefined) {
         el.style.transition = el.dataset._prevTransition;
         delete el.dataset._prevTransition;
       }
 
-      // baseline opacities
+      // Set the normal overlay opacity.
       el.style.opacity = (k === this.activeQuadrant) ? '0.35' : '0';
     });
 
-    // start timing and accept clicks and sync the timing with paint
+    // Wait for the browser to paint. Then start the timer and accept clicks.
     requestAnimationFrame(() => {
       this.intervalStart = performance.now();
       this.roundReady = true;
     });
 
-    // ensure a slot exists for this interval in arrays
+    // Create an array entry for this interval.
     this.times[this.currentIndex] = null;
-    this.labels[this.currentIndex] = 'missed'; // default - overwritten on correct click
+    this.labels[this.currentIndex] = 'missed'; // Replace this default value after a correct click.
     document.getElementById('qb-idx').textContent = (this.currentIndex + 1);
   },
 
   advanceInterval(area) {
-    // closing the current interval, if no correct click happened, it stays as miss
+    // Keep the interval marked as missed when no correct click occurs.
     if (!this.gameActive) return;
+    if (this.roundReady && this.labels[this.currentIndex] === 'missed') {
+      window.showGameFeedback({
+        type: 'warning',
+        message: 'Missed interval',
+        duration: Math.min(300, this.blinkIntervalMs)
+      });
+    }
 
     this.currentIndex++;
     if (this.currentIndex >= this.intervalsCount) {
-      // remove highlight and stop cadence
+      // Remove the highlight and stop the interval timer.
       ['UL','UR','LL','LR'].forEach(k => {
         const el = document.getElementById(`qb-ov-${k}`);
         if (el) el.style.opacity = '0';
@@ -275,13 +278,13 @@ window.quadrantBlink = {
       clearInterval(this.intervalId);
       this.intervalId = null;
 
-      // compute missed count
+      // Calculate the number of missed intervals.
       this.missedIntervals = this.labels.filter(x => x === 'missed').length;
       this.finish();
       return;
     }
 
-    // next interval
+    // Prepare the next interval.
     this.roundReady = false;
     this.tick(area);
   },
@@ -289,11 +292,9 @@ window.quadrantBlink = {
   handleClick(clicked) {
     if (!this.gameActive || !this.roundReady) return;
 
-    // time based gate: the click only counts if it lands within the real
-    // interval window, measured on the SAME clock as the reaction time
-    // this makes the displayed blink speed the true window, regardless of
-    // setInterval jitter (which could otherwise keep a quadrant lit a few
-    // ms too long and let an over time click slip through as correct)
+    // Count a click only when it occurs during the real interval window.
+    // Use the same clock for the interval window and the reaction time.
+    // This check prevents interval timer delays from extending the valid window.
     const rt = Math.round(performance.now() - this.intervalStart);
     const withinWindow = rt <= this.blinkIntervalMs;
 
@@ -303,28 +304,45 @@ window.quadrantBlink = {
       this.labels[this.currentIndex] = 'correct';
 
       this.flashOverlayUntilNextTick(this.activeQuadrant, 0.95);
+      window.showGameFeedback({
+        type: 'success',
+        message: `Hit • ${rt} ms`,
+        duration: Math.min(300, this.blinkIntervalMs),
+        pulseTarget: '#qb-area'
+      });
     } else if (clicked === this.activeQuadrant && !withinWindow) {
-      // right quadrant but too late - counts as a miss of this interval
+      // Record a miss when the correct quadrant is clicked too late.
       this.labels[this.currentIndex] = 'missed';
+      window.showGameFeedback({
+        type: 'warning',
+        message: 'Too late',
+        duration: Math.min(320, this.blinkIntervalMs),
+        pulseTarget: '#qb-area'
+      });
     } else {
       this.wrongClicks++;
-      // wrong click on this interval
+      // Record a wrong click for this interval.
       this.labels[this.currentIndex] = 'wrong';
+      window.showGameFeedback({
+        type: 'error',
+        message: 'Wrong quadrant',
+        duration: Math.min(320, this.blinkIntervalMs),
+        pulseTarget: '#qb-area'
+      });
     }
 
-    // accept only the first click per interval
+    // Accept only the first click in each interval.
     this.roundReady = false;
   },
 
-  // evaluation for next speed progression
+  // Evaluate progress toward the next speed.
   evaluateProgress(results) {
     const correctCount = results.labels.filter(l => l === 'correct').length;
     const accuracy = correctCount / results.intervalsCount;
-    const neededCorrect = Math.floor(results.intervalsCount * 0.75);
+    const neededCorrect = Math.ceil(results.intervalsCount * 0.75);
 
-    // readiness target = the NEXT step's window (5 ms faster)
-    // you qualify when at least half of your correct clicks already land within that next step
-    // and 75% accuracy
+    // Set the next interval window 5 milliseconds faster.
+    // Require 75 percent accuracy. Also require half of the correct clicks to fit the next time window - be faster.
     const nextSpeed = Math.max(100, results.blinkIntervalMs - 5);
 
     let consistency = 0;
@@ -356,7 +374,7 @@ window.quadrantBlink = {
     const ov = document.getElementById(`qb-ov-${k}`);
     if (!ov) return;
 
-    // quick light up
+    // Show a short feedback flash.
     const prevTransition = ov.style.transition;
     ov.style.transition = 'opacity 60ms ease';
     ov.style.opacity = String(peak);
@@ -373,8 +391,8 @@ window.quadrantBlink = {
     const results = {
       intervalsCount: this.intervalsCount,
       blinkIntervalMs: this.blinkIntervalMs,
-      times: this.times,    // per interval ms or null
-      labels: this.labels,    // 'correct' | 'wrong' | 'missed'
+      times: this.times,    // Store milliseconds for each interval, or null.
+      labels: this.labels,    // Use "correct", "wrong", or "missed" for each interval.
       average: avg,
       wrongClicks: this.wrongClicks,
       missedIntervals: this.missedIntervals,
@@ -387,9 +405,8 @@ window.quadrantBlink = {
     this.showResultsOverlay(results, progress);
     this.endCallback(results);
 
-    // history
-    const history = JSON.parse(localStorage.getItem('quadrantBlink_history') || '[]');
-    history.push({
+    // Add the result to history.
+    const historyEntry = {
       date: new Date().toLocaleString(),
       intervalsCount: this.intervalsCount,
       blinkIntervalMs: this.blinkIntervalMs,
@@ -399,12 +416,25 @@ window.quadrantBlink = {
       times: this.times,
       progress: progress,
       official: this.isOfficial
+    };
+    window.appendHistory('quadrantBlink_history', historyEntry, {
+      config: h => ({
+        official: !!h.official,
+        intervalsCount: h.intervalsCount,
+        blinkIntervalMs: h.blinkIntervalMs
+      }),
+      label: h => `${h.official ? '★ Official' : 'Custom'} • ${h.intervalsCount} intervals @ ${h.blinkIntervalMs} ms`,
+      metrics: {
+        average: h => Number.isFinite(h.average) ? h.average : null,
+        errors: h => (Number(h.missedIntervals) || 0) + (Number(h.wrongClicks) || 0),
+        accuracy: h => h.progress && Number.isFinite(h.progress.accuracy) ? h.progress.accuracy : null,
+        qualifies: h => h.progress && typeof h.progress.qualifies === 'boolean' ? (h.progress.qualifies ? 1 : 0) : null
+      }
     });
-    localStorage.setItem('quadrantBlink_history', JSON.stringify(history));
   },
 
-  // tiers on avg reaction time (correct only)
-  // ranks are based on nothing, felt about right
+  // Base the rank on the average time for correct reactions.
+  // The rank limits are estimates.
   getCategoryForMs(ms) {
     if (ms === null || ms === undefined) return { label: "No Data", color: "#888", range: "no correct intervals" };
     if (ms <= 200)  return { label: "Phenomenal", color: "#00e5ff", range: "≤ 200 ms - exceptional" };
@@ -417,7 +447,6 @@ window.quadrantBlink = {
 
   showResultsOverlay(results, progress) {
     const container = document.getElementById('game-container');
-    // only award a real rank if the player actually qualified (met the accuracy + consistency bar)
     const ranked = progress.qualifies;
     const category = ranked
       ? this.getCategoryForMs(results.average)
@@ -434,17 +463,6 @@ window.quadrantBlink = {
       { label: "Developing", range: "> 460 ms", color: "#f44336" }
     ];
 
-    const benchmarkHTML = `
-      <div class="badge-stack">
-        ${benchmarks.map(b => `
-          <div class="tier-badge" style="background:${b.color}">
-            <strong>${b.label}</strong>
-            <small>${b.range}</small>
-          </div>
-        `).join("")}
-      </div>
-    `;
-
     const rows = results.times.map((t, i) => {
       const L = results.labels[i];
       const tdisp = Number.isFinite(t) ? `${t} ms` : '- - -';
@@ -452,50 +470,46 @@ window.quadrantBlink = {
       return `<tr><td>${i + 1}</td><td style="color:${color};">${tdisp}</td><td>${L}</td></tr>`;
     }).join('');
 
-    container.innerHTML = `
-      <div style="text-align:center;color:#e0e1dd;">
-        <h2>Quadrant Blink${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
-        <div class="results-layout">
-          <div class="column-left">
-            ${benchmarkHTML}
-          </div>
-          <div class="column-separator"></div>
-          <div class="column-right">
-            <div class="current-result-badge" style="background:${category.color}">
-              <strong>${category.label}</strong>
-              <small>${category.range}</small>
-            </div>
-            <table style="margin:0 auto 6px auto;border-collapse:collapse;color:white;">
-              <tr><td style="text-align:left;">Avg reaction (correct)</td>
-                  <td style="text-align:right;padding-left:20px;">${results.average !== null ? results.average + ' ms' : '-'}</td></tr>
-              <tr><td style="text-align:left;">Errors (missed + wrong)</td>
-                  <td style="text-align:right;padding-left:20px;">${totalErrors}</td></tr>
-              <tr><td style="text-align:left;">Accuracy</td>
-                  <td style="text-align:right;padding-left:20px;">${progress.accuracy}%</td></tr>
-              <tr><td style="text-align:left;">Speed / intervals</td>
-                  <td style="text-align:right;padding-left:20px;">${results.blinkIntervalMs} ms / ${results.intervalsCount}</td></tr>
-            </table>
-            <div style="font-size:0.85em; opacity:0.9; margin-bottom:6px;">
-              Next level: <strong style="color:${progress.qualifies ? '#2ec4b6' : '#f44336'};">${progress.qualifies ? 'YES' : 'NO'}</strong>
-              <span style="opacity:0.8;">(need ${progress.neededCorrect}/${results.intervalsCount} correct + consistency)</span>
-            </div>
-            <div style="max-height:200px; overflow-y:auto; width:100%;">
-              <table class="results-table" style="margin:0 auto;">
-                <tr><th>#</th><th>Reaction</th><th>Label</th></tr>
-                ${rows}
-              </table>
-            </div>
-          </div>
-        </div>
-        <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-          <button onclick="window.quadrantBlink.startGame()">Restart</button>
-          <button onclick="window.quadrantBlink.returnToMenu()">Back to Menu</button>
-        </div>
-      </div>
-    `;
+    container.innerHTML = window.renderResultScreen({
+      drillName: 'Quadrant Blink',
+      official: results.official,
+      primary: {
+        label: ranked ? 'Qualified average' : 'Qualification result',
+        value: ranked && results.average !== null ? `${results.average} ms` : 'Unranked',
+        hint: ranked
+          ? `${progress.correctCount}/${results.intervalsCount} correct intervals`
+          : `${progress.accuracy}% accuracy • ${progress.correctCount}/${results.intervalsCount} correct`,
+        color: category.color
+      },
+      metrics: [
+        { label: 'Correct-click average', value: results.average !== null ? `${results.average} ms` : '-' },
+        { label: 'Accuracy', value: `${progress.accuracy}%`, tone: progress.accuracy >= 75 ? 'success' : 'warning' },
+        { label: 'Errors', value: totalErrors, tone: totalErrors ? 'warning' : 'success' },
+        { label: 'Interval speed', value: `${results.blinkIntervalMs} ms` }
+      ],
+      assessment: {
+        eyebrow: 'Performance tier',
+        title: category.label,
+        description: category.range,
+        color: category.color,
+        benchmarks: benchmarks.map(benchmark => ({
+          ...benchmark,
+          active: ranked && benchmark.label === category.label
+        })),
+        footer: `Next level: ${progress.qualifies ? 'YES' : 'NO'} • need ${progress.neededCorrect}/${results.intervalsCount} correct and at least 50% consistency at ${progress.nextSpeed} ms`
+      },
+      breakdown: {
+        title: 'Interval breakdown',
+        headers: ['Interval', 'Reaction', 'Result'],
+        rows,
+        note: 'Only correct clicks contribute to the reaction-time average.'
+      },
+      restartAction: 'window.quadrantBlink.startGame()',
+      backAction: 'window.quadrantBlink.returnToMenu()'
+    });
   },
 
-  // settings saved msg
+  // Show a message after the settings are saved.
   showPopupMessage: function(text) {
         const panel = document.getElementById('settings-panel');
         const msg = document.createElement('div');
@@ -509,28 +523,42 @@ window.quadrantBlink = {
     },
 
   showHistory() {
-    const history = JSON.parse(localStorage.getItem('quadrantBlink_history') || '[]');
+    const history = window.readStoredJSON('quadrantBlink_history', []);
     const container = document.getElementById('game-container');
     container.classList.remove('hidden');
 
     if (!history.length) {
-      container.innerHTML = `
-        <div style="text-align:center; margin-top:20px;">
-          <h3>No history found</h3>
-          <button onclick="window.quadrantBlink.returnToMenu()">Back</button>
-        </div>
-      `;
+      container.innerHTML = window.renderEmptyHistory({
+        drillName: 'Quadrant Blink',
+        backAction: 'window.quadrantBlink.returnToMenu()'
+      });
       return;
     }
 
-    const rows = history.map((h,i) => {
+    const archive = history.find(h => h && h._compacted === true);
+    const recent = history.filter(h => h && typeof h === 'object' && h._compacted !== true);
+    const historyOffset = archive ? Number(archive.sessionCount) || 0 : 0;
+    const compactedRow = window.renderCompactedHistoryRow(archive, 8, group => {
+      const reaction = window.getCompactedMetric(group, 'average');
+      const errors = window.getCompactedMetric(group, 'errors');
+      const accuracy = window.getCompactedMetric(group, 'accuracy');
+      const qualifies = window.getCompactedMetric(group, 'qualifies');
+      return `<div class="compacted-history-group">
+        <strong>${window.escapeHTML(group.label)}</strong><br>
+        ${group.sessionCount} runs • ${reaction ? Math.round(reaction.average) + ' ms average / ' + Math.round(reaction.min) + ' ms best' : 'no ranked timing data'} •
+        ${accuracy ? accuracy.average.toFixed(1) + '% accuracy' : '-'} • ${errors ? errors.average.toFixed(1) : '0'} errors/run •
+        ${qualifies ? Math.round(qualifies.average * 100) : 0}% ready-next rate
+      </div>`;
+    });
+
+    const rows = recent.slice().reverse().map((h,i) => {
       const prog = h.progress || {};
       const errors = (h.missedIntervals || 0) + (h.wrongClicks || 0);
       const ranked = prog.qualifies;
       const avgDisp = (ranked && h.average != null) ? (h.average + ' ms') : 'Unranked';
       return `
         <tr>
-          <td>${i+1}</td>
+          <td>${historyOffset + recent.length - i}</td>
           <td>${h.date}</td>
           <td>${h.official ? '★ Official' : '-'}</td>
           <td>${h.intervalsCount} @ ${h.blinkIntervalMs}ms</td>
@@ -542,22 +570,15 @@ window.quadrantBlink = {
       `;
     }).join('');
 
-    container.innerHTML = `
-      <div style="max-width:95%; margin:auto; color:#e0e1dd;">
-        <h2 style="text-align:center;">Quadrant Blink History</h2>
-        <div style="max-height:70vh; overflow-y:auto;">
-          <table class="results-table">
-            <tr>
-              <th>#</th><th>Date</th><th>Mode</th><th>Config</th><th>Average</th><th>Errors</th><th>Accuracy %</th><th>Ready Next?</th>
-            </tr>
-            ${rows}
-          </table>
-        </div>
-        <div style="text-align:center; margin-top:10px;">
-          <button onclick="window.quadrantBlink.returnToMenu()">Back</button>
-        </div>
-      </div>
-    `;
+    container.innerHTML = window.renderHistoryScreen({
+      drillName: 'Quadrant Blink',
+      headers: ['#', 'Date', 'Mode', 'Config', 'Average', 'Errors', 'Accuracy %', 'Ready Next?'],
+      rows,
+      compactedRow,
+      recentCount: recent.length,
+      archivedCount: historyOffset,
+      backAction: 'window.quadrantBlink.returnToMenu()'
+    });
   },
 
   returnToMenu() {
@@ -576,4 +597,3 @@ window.quadrantBlink = {
     }
   }
 };
-

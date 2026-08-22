@@ -2,39 +2,85 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>TapLab</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <!-- Settings Button -->
-    <button id="settings-btn" title="Settings">⚙</button>
+    <!-- Open the settings panel. -->
+    <button id="settings-btn" title="Settings" aria-label="Settings" aria-controls="settings-panel" aria-expanded="false">⚙</button>
 
-    <!-- Settings Panel -->
-    <div id="settings-panel" class="hidden">
-        <h2>Settings</h2>
+    <!-- Show the settings panel. -->
+    <div id="settings-panel" class="hidden" aria-label="TapLab settings">
+        <div class="settings-panel-header">
+            <div>
+                <span>TapLab controls</span>
+                <h2 id="settings-title">Settings</h2>
+            </div>
+            <button id="close-settings" aria-label="Close settings">×</button>
+        </div>
         <div id="level-specific-settings"></div>
-        <button class="reset-btn" id="reset-level">Reset This Level's Scores</button>
-        <button class="reset-btn" id="reset-global">Reset All Scores & Settings</button>
-        <button id="close-settings">Close</button>
+        <div class="settings-data-section">
+            <span>Local data</span>
+            <button class="reset-btn" id="reset-level">Reset This Level's Scores</button>
+            <button class="reset-btn" id="reset-global">Reset All Scores & Settings</button>
+        </div>
+        <div id="settings-feedback" class="settings-feedback hidden" role="status" aria-live="polite"></div>
         <h6>Made with not so much ❤️ by Thorgin &copy; 2025</h6>
     </div>
 
-    <!-- Main Menu -->
-    <div id="menu">
-        <h1>TapLab - reflex trainer 9000</h1>
-        <h5>Made with not so much ❤️ by Thorgin &copy; 2025</h5>
-        <button class="menu-btn" onclick="startLevel('reaction')">Reaction Test</button>
-        <button class="menu-btn" onclick="startLevel('popupTargets')">Pop-up Targets</button>
-        <button class="menu-btn" onclick="startLevel('peripheral')">Peripheral Awareness</button>
-        <button class="menu-btn" onclick="startLevel('quadrantBlink')">Quadrant Blink</button>
-        <button class="menu-btn" onclick="startLevel('schulte')">Schulte Table</button>
-        <button class="menu-btn" onclick="startLevel('quadrantTargets')">Quadrant + Target</button>
-        <button class="menu-btn" onclick="startLevel('stroop')">Stroop Test</button>
+    <!-- Show the custom confirmation menu. -->
+    <div id="confirm-overlay" class="confirm-overlay hidden" role="dialog" aria-modal="true"
+         aria-labelledby="confirm-title" aria-describedby="confirm-message" aria-hidden="true">
+        <div class="confirm-card">
+            <h2 id="confirm-title">Confirm</h2>
+            <p id="confirm-message"></p>
+            <div class="confirm-actions">
+                <button id="confirm-cancel">Cancel</button>
+                <button id="confirm-accept" class="reset-btn">Confirm</button>
+            </div>
+        </div>
     </div>
 
-    <!-- Game Container -->
+    <!-- Show the main menu. -->
+    <div id="menu" class="menu-shell">
+        <header class="menu-header">
+            <span class="menu-eyebrow">TapLab • reflex trainer 9000</span>
+            <h1>Train the moment between seeing and reacting.</h1>
+            <p>Seven focused drills for reaction speed, visual attention, peripheral awareness, and control.</p>
+        </header>
+        <div class="menu-grid" aria-label="Training drills">
+            <button class="menu-card" onclick="startLevel('reaction')">
+                <span class="menu-card-number">01</span><span><strong>Reaction Test</strong><small>Raw visual response speed</small></span><b>→</b>
+            </button>
+            <button class="menu-card" onclick="startLevel('popupTargets')">
+                <span class="menu-card-number">02</span><span><strong>Pop-up Targets</strong><small>Acquire, hover, and click</small></span><b>→</b>
+            </button>
+            <button class="menu-card" onclick="startLevel('peripheral')">
+                <span class="menu-card-number">03</span><span><strong>Peripheral Awareness</strong><small>See without chasing</small></span><b>→</b>
+            </button>
+            <button class="menu-card" onclick="startLevel('quadrantBlink')">
+                <span class="menu-card-number">04</span><span><strong>Quadrant Blink</strong><small>Timed attention windows</small></span><b>→</b>
+            </button>
+            <button class="menu-card" onclick="startLevel('schulte')">
+                <span class="menu-card-number">05</span><span><strong>Schulte Table</strong><small>Visual search and scanning</small></span><b>→</b>
+            </button>
+            <button class="menu-card" onclick="startLevel('quadrantTargets')">
+                <span class="menu-card-number">06</span><span><strong>Quadrant + Target</strong><small>Two-stage acquisition</small></span><b>→</b>
+            </button>
+            <button class="menu-card" onclick="startLevel('stroop')">
+                <span class="menu-card-number">07</span><span><strong>Stroop Test</strong><small>Response inhibition</small></span><b>→</b>
+            </button>
+        </div>
+        <footer class="menu-footer">
+            <span>All results stay in this browser.</span>
+            <span>Made with not so much ❤️ by Thorgin &copy; 2025</span>
+        </footer>
+    </div>
+
+    <!-- Contain the active drill. -->
     <div id="game-container" class="hidden"></div>
-    <!-- Results Screen -->
+    <!-- Show the results screen. -->
     <div id="results" class="hidden">
         <h2>Results</h2>
         <div id="results-content"></div>

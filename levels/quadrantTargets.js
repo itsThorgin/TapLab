@@ -1,24 +1,25 @@
 window.quadrantTargets = {
-    // settings (overridden by saved)
-    cycles: 10,                 // number of real quadrant+target cycles (5..50)
-    targetSize: 25,             // px diameter of the spawned target
-    fakeEnabled: false,         // enable fake light ups
-    fakeChance: 0.3,            // chance a light up event is fake
-    fakeRepeatChance: 0.5,      // after a fake, chance another light up follows quickly
-    fakeDurationMs: 500,        // how long a fake stays lit
+    // Settings, saved settings can replace these values.
+    cycles: 10,                 // Set 5 to 50 real quadrant-and-target cycles.
+    targetSize: 25,             // Set the target diameter in pixels.
+    fakeEnabled: false,         // Enable fake light signals.
+    fakeChance: 0.3,            // Set the probability that a light signal is fake.
+    fakeRepeatChance: 0.5,      // Set the probability that another signal follows a fake signal.
+    fakeDurationMs: 500,        // Set how long a fake signal stays visible.
     isOfficial: false,
     OFFICIAL: { cycles: 25, targetSize: 10, fakeEnabled: true, fakeChance: 0.3 },
     officialLabel: "Official: 25 cycles, 10px target, fakes on (0.3)",
 
-    // runtime state
+    // Store the runtime state.
     currentCycle: 0,
-    quadRTs: [],                // ms: light up -> quadrant click (per cycle)
-    hoverTimes: [],             // ms: target spawn -> first hover (per cycle)
-    clickDelays: [],            // ms: hover -> target click (per cycle)
-    errors: 0,                  // wrong/fake quadrant clicks
-    activeQuadrant: null,       // currently lit real quadrant key, or null
-    isFakeActive: false,        // a fake light up is currently showing
-    phase: 'idle',              // 'idle' | 'quadrant' | 'target'
+    quadRTs: [],                // Store the time from the light signal to the quadrant click.
+    hoverTimes: [],             // Store the time from target display to the first pointer entry.
+    clickDelays: [],            // Store the time from the first pointer entry to the target click.
+    totalTimes: [],             // Store the time from the light signal to the target click.
+    errors: 0,                  // Count clicks on wrong or fake quadrants.
+    activeQuadrant: null,       // Store the active real quadrant key, or null.
+    isFakeActive: false,        // Indicate that a fake light signal is visible.
+    phase: 'idle',              // Use "idle", "quadrant", or "target".
     quadLitTime: 0,
     targetSpawnTime: 0,
     targetHoverTime: null,
@@ -27,7 +28,7 @@ window.quadrantTargets = {
     timeoutIds: [],
 
     init(endCallback) {
-        const saved = JSON.parse(localStorage.getItem('quadrantTargets_settings') || '{}');
+        const saved = window.readStoredJSON('quadrantTargets_settings', {});
         this.cycles = (saved.cycles >= 5 && saved.cycles <= 50) ? saved.cycles : 10;
         this.targetSize = [10, 15, 20, 25, 30].includes(saved.targetSize) ? saved.targetSize : 25;
         this.fakeEnabled = !!saved.fakeEnabled;
@@ -44,25 +45,49 @@ window.quadrantTargets = {
 
     renderSettingsPanel() {
         const panel = document.getElementById('level-specific-settings');
-        const sizeOpts = [25, 20, 15, 10, 30].sort((a,b)=>b-a)
-            .map(s => `<option value="${s}" ${this.targetSize === s ? 'selected' : ''}>${s} px</option>`).join('');
-        panel.innerHTML = `
-            <label>Cycles:
-                <input type="number" id="qt-cycles" min="5" max="50" value="${this.cycles}">
-            </label><br><br>
-            <label>Target size:
-                <select id="qt-size">${sizeOpts}</select>
-            </label><br><br>
-            <label>
-                <input type="checkbox" id="qt-fake" ${this.fakeEnabled ? 'checked' : ''}>
-                Enable fake light-ups
-            </label><br><br>
-            <label>Fake chance:
-                <input type="number" id="qt-fake-chance" min="0" max="1" step="0.05" value="${this.fakeChance}">
-            </label><br><br>
-            <button style="border:1px solid #0A0A23;" onclick="window.quadrantTargets.saveSettings()">Save Settings</button>
-            <button style="margin-left:6px;border:1px solid #0A0A23;" onclick="window.quadrantTargets.showHistory()">View History</button>
-        `;
+        panel.innerHTML = window.renderLevelSettings({
+            fields: [
+                {
+                    type: 'number',
+                    id: 'qt-cycles',
+                    label: 'Cycles',
+                    note: 'Complete quadrant-to-target sequences',
+                    min: 5,
+                    max: 50,
+                    value: this.cycles
+                },
+                {
+                    type: 'select',
+                    id: 'qt-size',
+                    label: 'Target size',
+                    note: 'Smaller targets demand more precision',
+                    options: [30, 25, 20, 15, 10].map(size => ({
+                        value: size,
+                        label: `${size} px`,
+                        selected: this.targetSize === size
+                    }))
+                },
+                {
+                    type: 'checkbox',
+                    id: 'qt-fake',
+                    label: 'Fake light-ups',
+                    note: 'Orange signals disappear and must be ignored',
+                    checked: this.fakeEnabled
+                },
+                {
+                    type: 'number',
+                    id: 'qt-fake-chance',
+                    label: 'Fake chance',
+                    note: 'Probability from 0 to 1 when fakes are enabled',
+                    min: 0,
+                    max: 1,
+                    step: 0.05,
+                    value: this.fakeChance
+                }
+            ],
+            saveAction: 'window.quadrantTargets.saveSettings()',
+            historyAction: 'window.quadrantTargets.showHistory()'
+        });
     },
 
     saveSettings() {
@@ -89,27 +114,30 @@ window.quadrantTargets = {
     showInstruction() {
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
-        container.innerHTML = `
-            <div style="text-align:center;max-width:620px;margin:auto;">
-                <h2>Quadrant + Target</h2>
-                <p>
-                    A quadrant <strong>lights up</strong> - click it.<br>
-                    Then a <strong>target</strong> appears inside that quadrant - click it too.<br>
-                    Then the next quadrant lights up, and so on.<br>
-                    ${this.fakeEnabled ? 'Some light-ups are <strong style="color:#f4a261;">orange (fake)</strong>: they vanish on their own - don\'t click them! Only click <strong style="color:#2ec4b6;">teal</strong> ones.<br>' : ''}
-                    Measures quadrant reaction, target hover, and click time. ${this.cycles} cycles total.
-                </p>
-                <div style="display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.quadrantTargets.isOfficial=false;window.quadrantTargets.startGame()">Start</button>
-                    <button onclick="window.quadrantTargets.startOfficial()">Start Official</button>
-                    <button onclick="window.quadrantTargets.returnToMenu()">Back to Menu</button>
-                </div>
-                <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
-            </div>
-        `;
+        container.innerHTML = window.renderInstructionScreen({
+            drillName: 'Quadrant + Target',
+            summary: 'Combine broad visual reaction with precise pointer acquisition in one measured cycle.',
+            steps: [
+                'Click the quadrant when it lights up teal.',
+                'Acquire and click the small target that appears inside that quadrant.',
+                this.fakeEnabled
+                    ? 'Ignore orange fake light-ups; they disappear on their own. Respond only to teal.'
+                    : 'Repeat the quadrant-to-target sequence until every cycle is complete.'
+            ],
+            setup: [
+                { label: 'Cycles', value: this.cycles },
+                { label: 'Target', value: `${this.targetSize} px` },
+                { label: 'Fakes', value: this.fakeEnabled ? `${Math.round(this.fakeChance * 100)}% chance` : 'Off' }
+            ],
+            note: 'TapLab records the full cycle plus quadrant reaction, target hover, and final click time separately.',
+            officialLabel: this.officialLabel,
+            startAction: 'window.quadrantTargets.isOfficial=false;window.quadrantTargets.startGame()',
+            officialAction: 'window.quadrantTargets.startOfficial()',
+            backAction: 'window.quadrantTargets.returnToMenu()'
+        });
     },
 
-    // load the fixed official preset (bypasses saved settings) and start.
+    // Apply the fixed official preset. Do not use saved settings.
     startOfficial() {
         this.isOfficial = true;
         this.cycles = this.OFFICIAL.cycles;
@@ -120,10 +148,12 @@ window.quadrantTargets = {
     },
 
     startGame() {
+        window.lockSettingsForRun();
         this.currentCycle = 0;
         this.quadRTs = [];
         this.hoverTimes = [];
         this.clickDelays = [];
+        this.totalTimes = [];
         this.errors = 0;
         this.activeQuadrant = null;
         this.isFakeActive = false;
@@ -134,20 +164,19 @@ window.quadrantTargets = {
         this.gameActive = true;
 
         const container = document.getElementById('game-container');
-        container.innerHTML = `
-            <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-            <div style="text-align:center; margin-top:40px;">
-                <h3>Cycle <span id="qt-idx">1</span> / ${this.cycles}</h3>
-                <div id="qt-area" style="
-                    position:relative; width:60vw; aspect-ratio:16/9;
-                    background:#6c757d; border-radius:8px; overflow:hidden; margin:auto;
-                "></div>
-                <div style="margin-top:10px; opacity:0.8; font-size:0.9em;">
-                    Click the lit quadrant, then click the target that appears inside it.
-                </div>
-            </div>
-        `;
-        document.getElementById('back-btn').onclick = () => this.returnToMenu();
+        container.innerHTML = window.renderGameScreen({
+            drillName: 'Quadrant + Target',
+            mode: this.isOfficial ? 'Official' : 'Custom',
+            progressLabel: 'Cycle',
+            progressCurrent: 1,
+            progressTotal: this.cycles,
+            progressId: 'qt-idx',
+            stageHTML: '<div id="qt-area" class="game-arena game-arena-wide"></div>',
+            hint: this.fakeEnabled
+                ? 'Click teal quadrants, ignore orange fakes, then acquire the target.'
+                : 'Click the lit quadrant, then acquire and click the target inside it.',
+            backAction: 'window.quadrantTargets.returnToMenu()'
+        });
 
         const area = document.getElementById('qt-area');
         this.setupArena(area);
@@ -159,7 +188,7 @@ window.quadrantTargets = {
     },
 
     setupArena(area) {
-        // crosshair
+        // Draw the crosshair.
         const hLine = document.createElement('div');
         hLine.style.cssText = `position:absolute; left:0; top:50%; width:100%; height:2px; background:rgba(255,255,255,0.35); transform:translateY(-1px); pointer-events:none;`;
         const vLine = document.createElement('div');
@@ -173,7 +202,7 @@ window.quadrantTargets = {
             { key: 'LR', left: 50, top: 50 },
         ];
 
-        // highlight overlays (behind the clickable surfaces)
+        // Add highlight overlays behind the click surfaces.
         quads.forEach(q => {
             const overlay = document.createElement('div');
             overlay.id = `qt-ov-${q.key}`;
@@ -185,7 +214,7 @@ window.quadrantTargets = {
             area.appendChild(overlay);
         });
 
-        // clickable quadrants
+        // Add the quadrant click surfaces.
         quads.forEach(q => {
             const Q = document.createElement('div');
             Q.dataset.quadrant = q.key;
@@ -197,14 +226,14 @@ window.quadrantTargets = {
                 font-size:.8em; color:rgba(255,255,255,0.45); pointer-events:none;
             `;
             Q.appendChild(label);
-            Q.addEventListener('mousedown', (e) => {
+            window.onPrimaryPointerDown(Q, (e) => {
                 if (!this.gameActive) return;
                 this.handleQuadrantClick(e.currentTarget.dataset.quadrant);
             });
             area.appendChild(Q);
         });
 
-        // center dot
+        // Draw the center dot.
         const centerDot = document.createElement('div');
         centerDot.style.cssText = `
             position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
@@ -225,10 +254,11 @@ window.quadrantTargets = {
         ov.style.opacity = on ? '0.85' : '0';
     },
 
-    // decide the next event: either a fake light up or a real one.
+    // Select a fake or real light signal for the next event.
     nextLightUp() {
         if (!this.gameActive) return;
         if (this.currentCycle >= this.cycles) { this.finish(); return; }
+        window.clearGameFeedback();
 
         const doFake = this.fakeEnabled && Math.random() < this.fakeChance;
         if (doFake) {
@@ -240,22 +270,22 @@ window.quadrantTargets = {
 
     startFake() {
         this.isFakeActive = true;
-        this.phase = 'idle'; // not a measured phase
+        this.phase = 'idle'; // Do not measure the idle phase.
         const key = this.randomQuadrant();
         this.fakeQuadrant = key;
-        this.setOverlay(key, true, '#f4a261'); // fake = orange (go/don't go)
+        this.setOverlay(key, true, '#f4a261'); // Use orange for a fake signal.
 
-        // fake vanishes on its own after fakeDurationMs (no penalty for ignoring)
+        // Remove the fake signal after fakeDurationMs. Do not penalize the player for no click.
         const id = setTimeout(() => {
             if (!this.gameActive) return;
             this.setOverlay(key, false);
             this.isFakeActive = false;
             this.fakeQuadrant = null;
-            // after a fake, maybe another light up soon, else a real one
+            // After a fake signal, show another signal soon or show a real signal.
             const delay = 200 + Math.random() * 500;
             const id2 = setTimeout(() => {
                 if (!this.gameActive) return;
-                // chance to chain another fake, otherwise go for real
+                // Use fakeRepeatChance to select another fake signal or a real signal.
                 if (this.fakeEnabled && Math.random() < this.fakeRepeatChance && Math.random() < this.fakeChance) {
                     this.startFake();
                 } else {
@@ -268,41 +298,61 @@ window.quadrantTargets = {
     },
 
     startRealQuadrant() {
-        this.phase = 'quadrant';
+        this.phase = 'idle';
         this.isFakeActive = false;
         this.activeQuadrant = this.randomQuadrant();
-        this.setOverlay(this.activeQuadrant, true, '#2ec4b6'); // real = teal
-        this.quadLitTime = performance.now();
+        const key = this.activeQuadrant;
+        this.setOverlay(key, true, '#2ec4b6'); // Use teal for a real signal.
+        const overlay = document.getElementById(`qt-ov-${key}`);
+
+        requestAnimationFrame(() => {
+            if (!this.gameActive || !overlay || !overlay.isConnected || this.activeQuadrant !== key) return;
+            this.quadLitTime = performance.now();
+            this.phase = 'quadrant';
+        });
     },
 
     handleQuadrantClick(clicked) {
-        // clicking during a fake light up = error
+        // Record an error when the player clicks during a fake signal.
         if (this.isFakeActive) {
             if (clicked === this.fakeQuadrant) {
                 this.errors++;
+                window.showGameFeedback({
+                    type: 'error',
+                    message: 'False signal',
+                    duration: 420,
+                    pulseTarget: '#qt-area'
+                });
                 this.flashError(clicked);
             }
             return;
         }
 
-        // only meaningful during the quadrant phase
+        // Process the click only during the quadrant phase.
         if (this.phase !== 'quadrant' || !this.activeQuadrant) return;
 
         if (clicked === this.activeQuadrant) {
-            // correct quadrant: record RT, turn off highlight, spawn target inside it
+            // Record the reaction time for the correct quadrant.
+            // Remove its highlight and show a target inside it.
             const rt = Math.round(performance.now() - this.quadLitTime);
             this.quadRTs.push(rt);
             this.setOverlay(this.activeQuadrant, false);
             this.spawnTargetInQuadrant(this.activeQuadrant);
         } else {
-            // wrong quadrant: error, keep waiting on the correct one
+            // Record an error for a wrong quadrant. Continue to wait for the correct quadrant.
             this.errors++;
+            window.showGameFeedback({
+                type: 'error',
+                message: 'Wrong quadrant',
+                duration: 420,
+                pulseTarget: '#qt-area'
+            });
             this.flashError(clicked);
         }
     },
 
     spawnTargetInQuadrant(key) {
-        this.phase = 'target';
+        this.phase = 'idle';
         this.targetHoverTime = null;
         const area = document.getElementById('qt-area');
         if (!area) return;
@@ -310,10 +360,10 @@ window.quadrantTargets = {
         const W = area.clientWidth, H = area.clientHeight;
         const halfW = W / 2, halfH = H / 2;
         const size = this.targetSize;
-        // quadrant origin
+        // Calculate the quadrant origin.
         const ox = (key === 'UR' || key === 'LR') ? halfW : 0;
         const oy = (key === 'LL' || key === 'LR') ? halfH : 0;
-        // keep target fully inside the quadrant
+        // Keep the complete target inside the quadrant.
         const x = ox + Math.random() * Math.max(1, halfW - size);
         const y = oy + Math.random() * Math.max(1, halfH - size);
 
@@ -325,15 +375,22 @@ window.quadrantTargets = {
             background:#2ec4b6; cursor:pointer; z-index:7;
             box-shadow:0 0 6px rgba(46,196,182,0.6);
         `;
-        target.addEventListener('mouseenter', () => {
-            if (this.targetHoverTime === null) this.targetHoverTime = performance.now();
+        target.addEventListener('pointerenter', (event) => {
+            if (event.pointerType === 'touch') return;
+            if (this.phase === 'target' && this.targetHoverTime === null) {
+                this.targetHoverTime = performance.now();
+            }
         });
-        target.addEventListener('mousedown', (e) => {
+        window.onPrimaryPointerDown(target, (e) => {
             e.stopPropagation();
             this.handleTargetClick();
         });
         area.appendChild(target);
-        this.targetSpawnTime = performance.now();
+        requestAnimationFrame(() => {
+            if (!this.gameActive || !target.isConnected || this.activeQuadrant !== key) return;
+            this.targetSpawnTime = performance.now();
+            this.phase = 'target';
+        });
     },
 
     handleTargetClick() {
@@ -341,8 +398,16 @@ window.quadrantTargets = {
         const now = performance.now();
         const hover = this.targetHoverTime ? Math.round(this.targetHoverTime - this.targetSpawnTime) : null;
         const clickDelay = (this.targetHoverTime !== null) ? Math.round(now - this.targetHoverTime) : null;
+        const total = Math.round(now - this.quadLitTime);
         this.hoverTimes.push(hover);
         this.clickDelays.push(clickDelay);
+        this.totalTimes.push(total);
+        window.showGameFeedback({
+            type: 'success',
+            message: `Cycle • ${total} ms`,
+            duration: 360,
+            pulseTarget: '#qt-area'
+        });
 
         const target = document.getElementById('qt-target');
         if (target) target.remove();
@@ -358,7 +423,7 @@ window.quadrantTargets = {
             const id = setTimeout(() => this.finish(), 150);
             this.timeoutIds.push(id);
         } else {
-            // brief pause then next light-up
+            // Use a short pause before the next light signal.
             const id = setTimeout(() => this.nextLightUp(), 250 + Math.random() * 350);
             this.timeoutIds.push(id);
         }
@@ -372,8 +437,8 @@ window.quadrantTargets = {
         ov.style.background = '#e63946';
         ov.style.opacity = '0.7';
         const id = setTimeout(() => {
-            // restore: if this is a still active real quadrant keep it teal,
-            // a still active fake keep it orange, otherwise hide it
+            // Restore the overlay state after the feedback flash.
+            // Use teal for an active real signal and orange for an active fake signal. Hide other overlays.
             if (this.phase === 'quadrant' && this.activeQuadrant === key) {
                 ov.style.background = '#2ec4b6';
                 ov.style.opacity = '0.85';
@@ -397,14 +462,19 @@ window.quadrantTargets = {
         const avgQuad = avg(this.quadRTs);
         const avgHover = avg(this.hoverTimes);
         const avgClick = avg(this.clickDelays);
+        const avgTotal = avg(this.totalTimes);
 
         const results = {
             cycles: this.cycles,
+            avgTotal,
             avgQuadRT: avgQuad,
             avgHover: avgHover,
             avgClick: avgClick,
             errors: this.errors,
             quadRTs: this.quadRTs,
+            hoverTimes: this.hoverTimes,
+            clickDelays: this.clickDelays,
+            totalTimes: this.totalTimes,
             official: this.isOfficial,
             _customOverlay: true
         };
@@ -412,43 +482,85 @@ window.quadrantTargets = {
         this.showResultsOverlay(results);
         this.endCallback(results);
 
-        const history = JSON.parse(localStorage.getItem('quadrantTargets_history') || '[]');
-        history.push({
+        const historyEntry = {
             date: new Date().toLocaleString(),
             cycles: this.cycles,
+            targetSize: this.targetSize,
+            fakeEnabled: this.fakeEnabled,
+            fakeChance: this.fakeChance,
+            avgTotal,
             avgQuadRT: avgQuad,
             avgHover: avgHover,
             avgClick: avgClick,
             errors: this.errors,
             official: this.isOfficial
+        };
+        window.appendHistory('quadrantTargets_history', historyEntry, {
+            config: h => ({
+                official: !!h.official,
+                cycles: h.cycles,
+                targetSize: h.official ? 10 : (Number.isFinite(h.targetSize) ? h.targetSize : null),
+                fakeEnabled: h.official ? true : (typeof h.fakeEnabled === 'boolean' ? h.fakeEnabled : null),
+                fakeChance: h.official ? 0.3 : (Number.isFinite(h.fakeChance) ? h.fakeChance : null)
+            }),
+            label: h => {
+                const targetSize = h.official ? 10 : h.targetSize;
+                const fakeEnabled = h.official ? true : h.fakeEnabled;
+                const fakeChance = h.official ? 0.3 : h.fakeChance;
+                const sizeLabel = Number.isFinite(targetSize) ? `${targetSize}px` : 'legacy target size';
+                const fakeLabel = typeof fakeEnabled === 'boolean'
+                    ? `fakes ${fakeEnabled ? `on (${Number.isFinite(fakeChance) ? fakeChance : '?'})` : 'off'}`
+                    : 'legacy fake setting';
+                return `${h.official ? '★ Official' : 'Custom'} • ${h.cycles} cycles • ${sizeLabel} • ${fakeLabel}`;
+            },
+            metrics: {
+                avgTotal: h => Number.isFinite(h.avgTotal) ? h.avgTotal : null,
+                avgQuadRT: h => Number.isFinite(h.avgQuadRT) ? h.avgQuadRT : null,
+                avgHover: h => Number.isFinite(h.avgHover) ? h.avgHover : null,
+                avgClick: h => Number.isFinite(h.avgClick) ? h.avgClick : null,
+                errors: h => Number.isFinite(h.errors) ? h.errors : null
+            }
         });
-        localStorage.setItem('quadrantTargets_history', JSON.stringify(history));
     },
 
     showResultsOverlay(results) {
         const container = document.getElementById('game-container');
+        const formatMs = value => Number.isFinite(value) ? `${value} ms` : '-';
+        const rows = results.totalTimes.map((total, index) => `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${formatMs(total)}</td>
+                <td>${formatMs(results.quadRTs[index])}</td>
+                <td>${formatMs(results.hoverTimes[index])}</td>
+                <td>${formatMs(results.clickDelays[index])}</td>
+            </tr>
+        `).join('');
 
-        container.innerHTML = `
-            <div style="text-align:center;color:#e0e1dd; max-width:560px; margin:auto;">
-                <h2>Quadrant + Target${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
-                <table style="margin:10px auto;border-collapse:collapse;color:white;">
-                    <tr><td style="text-align:left;">Cycles</td>
-                        <td style="text-align:right;padding-left:24px;">${results.cycles}</td></tr>
-                    <tr><td style="text-align:left;">Avg quadrant reaction</td>
-                        <td style="text-align:right;padding-left:24px;">${results.avgQuadRT !== null ? results.avgQuadRT + ' ms' : '-'}</td></tr>
-                    <tr><td style="text-align:left;">Avg target hover</td>
-                        <td style="text-align:right;padding-left:24px;">${results.avgHover !== null ? results.avgHover + ' ms' : '-'}</td></tr>
-                    <tr><td style="text-align:left;">Avg target click delay</td>
-                        <td style="text-align:right;padding-left:24px;">${results.avgClick !== null ? results.avgClick + ' ms' : '-'}</td></tr>
-                    <tr><td style="text-align:left;">Errors</td>
-                        <td style="text-align:right;padding-left:24px;">${results.errors}</td></tr>
-                </table>
-                <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.quadrantTargets.restartGame()">Restart</button>
-                    <button onclick="returnToMenu()">Back to Menu</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderResultScreen({
+            drillName: 'Quadrant + Target',
+            official: results.official,
+            primary: {
+                label: 'Average full-cycle time',
+                value: formatMs(results.avgTotal),
+                hint: 'Real quadrant appearance to target click',
+                color: '#2ec4b6'
+            },
+            metrics: [
+                { label: 'Avg quadrant reaction', value: formatMs(results.avgQuadRT) },
+                { label: 'Avg target hover', value: formatMs(results.avgHover) },
+                { label: 'Avg click delay', value: formatMs(results.avgClick) },
+                { label: 'Errors', value: results.errors, tone: results.errors ? 'warning' : 'success' },
+                { label: 'Cycles', value: results.cycles }
+            ],
+            breakdown: {
+                title: 'Cycle breakdown',
+                headers: ['Cycle', 'Total', 'Quadrant RT', 'Target hover', 'Click delay'],
+                rows,
+                note: 'Total is measured end to end and can include the short transition between stages.'
+            },
+            restartAction: 'window.quadrantTargets.restartGame()',
+            backAction: 'returnToMenu()'
+        });
     },
 
     restartGame() {
@@ -459,25 +571,42 @@ window.quadrantTargets = {
     },
 
     showHistory() {
-        const history = JSON.parse(localStorage.getItem('quadrantTargets_history') || '[]');
+        const history = window.readStoredJSON('quadrantTargets_history', []);
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
 
         if (!history.length) {
-            container.innerHTML = `
-                <div style="text-align:center; margin-top:20px;">
-                    <h3>No history found</h3>
-                    <button onclick="window.quadrantTargets.showInstruction()">Back</button>
-                </div>
-            `;
+            container.innerHTML = window.renderEmptyHistory({
+                drillName: 'Quadrant + Target',
+                backAction: 'window.quadrantTargets.showInstruction()'
+            });
             return;
         }
 
-        const rows = history.slice().reverse().map(h => `
+        const archive = history.find(h => h && h._compacted === true);
+        const recent = history.filter(h => h && typeof h === 'object' && h._compacted !== true);
+        const archivedCount = archive ? Number(archive.sessionCount) || 0 : 0;
+        const compactedRow = window.renderCompactedHistoryRow(archive, 8, group => {
+            const total = window.getCompactedMetric(group, 'avgTotal');
+            const quadrant = window.getCompactedMetric(group, 'avgQuadRT');
+            const hover = window.getCompactedMetric(group, 'avgHover');
+            const click = window.getCompactedMetric(group, 'avgClick');
+            const errors = window.getCompactedMetric(group, 'errors');
+            return `<div class="compacted-history-group">
+                <strong>${window.escapeHTML(group.label)}</strong><br>
+                ${group.sessionCount} runs • total ${total ? Math.round(total.average) + ' ms' : '-'} •
+                quadrant ${quadrant ? Math.round(quadrant.average) + ' ms' : '-'} •
+                hover ${hover ? Math.round(hover.average) + ' ms' : '-'} • click ${click ? Math.round(click.average) + ' ms' : '-'} •
+                ${errors ? errors.average.toFixed(1) : '0'} errors/run
+            </div>`;
+        });
+
+        const rows = recent.slice().reverse().map(h => `
             <tr>
                 <td>${h.date}</td>
                 <td>${h.official ? '★ Official' : '-'}</td>
                 <td>${h.cycles}</td>
+                <td>${Number.isFinite(h.avgTotal) ? h.avgTotal + ' ms' : '-'}</td>
                 <td>${h.avgQuadRT !== null ? h.avgQuadRT + ' ms' : '-'}</td>
                 <td>${h.avgHover !== null ? h.avgHover + ' ms' : '-'}</td>
                 <td>${h.avgClick !== null ? h.avgClick + ' ms' : '-'}</td>
@@ -485,20 +614,15 @@ window.quadrantTargets = {
             </tr>
         `).join('');
 
-        container.innerHTML = `
-            <div style="text-align:center; max-width:820px; margin:auto;">
-                <h2>Quadrant + Target - History</h2>
-                <div style="max-height:60vh; overflow-y:auto;">
-                    <table class="results-table">
-                        <tr><th>Date</th><th>Mode</th><th>Cycles</th><th>Quad RT</th><th>Hover</th><th>Click</th><th>Errors</th></tr>
-                        ${rows}
-                    </table>
-                </div>
-                <div style="margin-top:14px;">
-                    <button onclick="window.quadrantTargets.showInstruction()">Back</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderHistoryScreen({
+            drillName: 'Quadrant + Target',
+            headers: ['Date', 'Mode', 'Cycles', 'Avg Total', 'Quad RT', 'Hover', 'Click', 'Errors'],
+            rows,
+            compactedRow,
+            recentCount: recent.length,
+            archivedCount,
+            backAction: 'window.quadrantTargets.showInstruction()'
+        });
     },
 
     showPopupMessage(text) {

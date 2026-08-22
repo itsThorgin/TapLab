@@ -2,7 +2,7 @@ window.reaction = {
     rounds: 5,
     isOfficial: false,
     OFFICIAL: { rounds: 25, falseStart: true },
-    officialLabel: "Official: 25 rounds, false-start on",
+    officialLabel: "Official: 25 rounds, false start on",
     currentRound: 0,
     times: [],
     timeoutIds: [],
@@ -13,7 +13,7 @@ window.reaction = {
     gameActive: false,
 
     init: function(endCallback) {
-        const savedSettings = JSON.parse(localStorage.getItem('reaction_settings')) || {};
+        const savedSettings = window.readStoredJSON('reaction_settings', {});
         const sr = parseInt(savedSettings.rounds);
         this.rounds = (Number.isFinite(sr) && sr >= 5 && sr <= 50) ? sr : 5;
         this.falseStartEnabled = savedSettings.falseStart || false;
@@ -32,17 +32,14 @@ window.reaction = {
 
     renderSettingsPanel: function() {
         const panel = document.getElementById('level-specific-settings');
-        panel.innerHTML = `
-            <label>Rounds: 
-                <input type="number" id="reaction-rounds" min="5" max="50" value="${this.rounds}">
-            </label><br><br>
-            <label>
-                <input type="checkbox" id="reaction-false-start" ${this.falseStartEnabled ? 'checked' : ''}>
-                Enable False Start Trick
-            </label><br><br>
-            <button style="border: 1px solid #0A0A23;" onclick="window.reaction.saveSettings()">Save Settings</button>
-            <button style="margin-left:6px; border:1px solid #0A0A23;" onclick="window.reaction.showHistory()">View History</button>
-        `;
+        panel.innerHTML = window.renderLevelSettings({
+            fields: [
+                { type: 'number', id: 'reaction-rounds', label: 'Rounds', note: 'Choose from 5 to 50', min: 5, max: 50, value: this.rounds },
+                { type: 'checkbox', id: 'reaction-false-start', label: 'False Start Trick', note: 'Orange bait signals may appear', checked: this.falseStartEnabled }
+            ],
+            saveAction: 'window.reaction.saveSettings()',
+            historyAction: 'window.reaction.showHistory()'
+        });
     },
 
     startWithCountdown: function() {
@@ -64,25 +61,27 @@ window.reaction = {
     showInstruction: function() {
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
-        container.innerHTML = `
-            <div style="text-align:center; max-width:600px; margin:auto;">
-                <h2>Reaction Test</h2>
-                <p>
-                    Click the rectangle as soon as it turns <strong style="color:#2ec4b6;">blue-green</strong>.<br>
-                    If it turns <strong style="color:orange;">orange</strong>, don't click - that's a trick color!<br>
-                    ${this.rounds} rounds total.
-                </p>
-                <div style="display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.reaction.isOfficial=false;window.reaction.startFirstRound()">Start</button>
-                    <button onclick="window.reaction.startOfficial()">Start Official</button>
-                    <button onclick="window.reaction.returnToMenu()">Back to Menu</button>
-                </div>
-                <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
-            </div>
-        `;
+        container.innerHTML = window.renderInstructionScreen({
+            drillName: 'Reaction Test',
+            summary: 'Measure the delay between a visual go signal and your click.',
+            steps: [
+                'Wait while the rectangle stays gray.',
+                'Click immediately when it turns teal.',
+                this.falseStartEnabled ? 'Ignore orange bait signals and keep waiting for teal.' : 'Complete every round as quickly and cleanly as possible.'
+            ],
+            setup: [
+                { label: 'Rounds', value: this.rounds },
+                { label: 'False start', value: this.falseStartEnabled ? 'On' : 'Off' }
+            ],
+            note: 'Timing begins when the teal signal is painted on screen.',
+            officialLabel: this.officialLabel,
+            startAction: 'window.reaction.isOfficial=false;window.reaction.startFirstRound()',
+            officialAction: 'window.reaction.startOfficial()',
+            backAction: 'window.reaction.returnToMenu()'
+        });
     },
 
-    // load the fixed official preset (bypasses saved settings) and start.
+    // Apply the fixed official preset. Do not use saved settings.
     startOfficial: function() {
         this.isOfficial = true;
         this.rounds = this.OFFICIAL.rounds;
@@ -94,61 +93,65 @@ window.reaction = {
     },
 
     startRound: function() {
-        this.clearTemporaryMessage(); // cancel any pending message from the prior attempt
+        this.clearTemporaryMessage(); // Remove a pending message from the previous attempt.
         this.gameActive = true;
         const container = document.getElementById('game-container');
-        container.innerHTML = `
-            <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-            <div style="text-align:center; margin-top:40px;">
-                <h3>Round ${this.currentRound + 1} of ${this.rounds}</h3>
-                <div id="reaction-box"
-                     style="width:60vw; aspect-ratio:16/9; background:#6c757d; border-radius:8px; cursor:pointer;"></div>
-            </div>
-        `;
-        document.getElementById('back-btn').onclick = () => this.returnToMenu();
+        container.innerHTML = window.renderGameScreen({
+            drillName: 'Reaction Test',
+            mode: this.isOfficial ? 'Official' : 'Custom',
+            progressLabel: 'Round',
+            progressCurrent: this.currentRound + 1,
+            progressTotal: this.rounds,
+            stageHTML: '<div id="reaction-box" class="game-arena game-arena-wide reaction-game-area"></div>',
+            hint: 'Wait for green. Orange is a false signal.',
+            backAction: 'window.reaction.returnToMenu()'
+        });
 
         const box = document.getElementById('reaction-box');
         this.clickable = false;
-        box.onmousedown = () => this.handleClick();
+        window.onPrimaryPointerDown(box, () => this.handleClick());
 
-        // schedule go signal (countdown only on first round)
+        // Schedule the go signal. Show the countdown only before the first round.
         this.scheduleGoSignal(box);
     },
 
-    // start just the first round with countdown overlay shown on the arena rectangle
+    // Start the first round and show the countdown in the arena.
     startFirstRound: function() {
+        window.lockSettingsForRun();
         this.gameActive = true;
 
-        // render the arena UI (same as startRound)
+        // Render the same arena interface that startRound uses.
         const container = document.getElementById('game-container');
-        container.innerHTML = `
-            <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-            <div style="text-align:center; margin-top:40px;">
-                <h3>Round ${this.currentRound + 1} of ${this.rounds}</h3>
-                <div id="reaction-box"
-                    style="width:60vw; aspect-ratio:16/9; background:#6c757d; border-radius:8px; cursor:pointer;"></div>
-            </div>
-        `;
-        document.getElementById('back-btn').onclick = () => this.returnToMenu();
+        container.innerHTML = window.renderGameScreen({
+            drillName: 'Reaction Test',
+            mode: this.isOfficial ? 'Official' : 'Custom',
+            progressLabel: 'Round',
+            progressCurrent: this.currentRound + 1,
+            progressTotal: this.rounds,
+            stageHTML: '<div id="reaction-box" class="game-arena game-arena-wide reaction-game-area"></div>',
+            hint: 'Wait for green. Orange is a false signal.',
+            backAction: 'window.reaction.returnToMenu()'
+        });
 
         const box = document.getElementById('reaction-box');
         this.clickable = false;
-        box.onmousedown = () => this.handleClick();
+        window.onPrimaryPointerDown(box, () => this.handleClick());
 
-        // show countdown in the arena rectangle, then schedule first go signal
-        window.show321(container, 500).then(() => {
+        // Show the countdown in the arena. Then schedule the first go signal.
+        window.show321(box, 500).then(() => {
+            if (!this.gameActive || !box.isConnected) return;
             this.scheduleGoSignal(box);
         });
     },
 
-    // schedule a falsestart sequence or the real go signal
+    // Schedule a false start sequence or the real go signal.
     scheduleGoSignal: function(box) {
-        let delay = 2000 + Math.random() * 3000; // 2-5 sec
+        let delay = 2000 + Math.random() * 3000; // Use a delay from 2 to 5 seconds.
         if (this.falseStartEnabled && Math.random() < 0.3) {
             const id1 = setTimeout(() => {
                 box.style.background = '#f4a261';
                 const id2 = setTimeout(() => {
-                    box.style.background = '#6c757d';
+                    box.style.background = '';
                     delay = 1000 + Math.random() * 2000;
                     const id3 = setTimeout(() => this.goSignal(box), delay);
                     this.timeoutIds.push(id3);
@@ -163,10 +166,10 @@ window.reaction = {
     },
 
     goSignal: function(box) {
-        this.clearTemporaryMessage(); // ensure no stale message overlaps the go color
+        this.clearTemporaryMessage(); // Prevent an old message from covering the go color.
         box.style.transition = "none";
         box.style.background = '#2ec4b6';
-        // start timer only after frame renders with new color
+        // Start the timer after the browser shows the new color.
         requestAnimationFrame(() => {
             this.startTime = performance.now();
             this.clickable = true;
@@ -180,15 +183,15 @@ window.reaction = {
         if (!this.clickable || !this.gameActive) {
             if (this.gameActive) {
                 if (this.falseStartEnabled && currentColor.includes("rgb(244, 162, 97)")) {
-                    this.showTemporaryMessage("Wrong color!", "#ff4d4d");
-                    // mark false start for current round
+                    this.showTemporaryMessage("False signal", "error");
+                    // Record a false start for the current round.
                     this.falseStarts[this.currentRound] = true;
-                    // keep waiting for blue and next click
+                    // Wait for the blue signal and the next click.
                 } else {
-                    this.showTemporaryMessage("Too soon!", "#ff9800");
+                    this.showTemporaryMessage("Too early", "error");
                     this.falseStarts[this.currentRound] = true;
                 
-                    // "too soon" restarts round
+                    // The "Too soon" message restarts the round.
                     this.cancelAllTimers();
                     const restartId = setTimeout(() => this.startRound(), 1000);
                     this.timeoutIds.push(restartId);
@@ -197,15 +200,21 @@ window.reaction = {
             return;
         }
 
-        // correct click
+        // Process a correct click.
         this.falseStarts[this.currentRound] = this.falseStarts[this.currentRound] || false;
         this.clickable = false;
         const reactionTime = Math.round(performance.now() - this.startTime);
         this.times.push(reactionTime);
+        window.showGameFeedback({
+            type: 'success',
+            message: `${reactionTime} ms`,
+            duration: 320,
+            pulseTarget: box
+        });
         this.currentRound++;
 
         box.style.transition = "background 0.4s";
-        box.style.background = "#6c757d";
+        box.style.background = "";
 
         if (this.currentRound >= this.rounds) {
             this.gameActive = false;
@@ -218,47 +227,51 @@ window.reaction = {
     },
 
     showHistory: function() {
-        const history = JSON.parse(localStorage.getItem('reaction_history') || '[]');
+        const history = window.readStoredJSON('reaction_history', []);
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
 
         if (!history.length) {
-            container.innerHTML = `
-                <div style="text-align:center; margin-top:20px;">
-                    <h3>No history found</h3>
-                    <button onclick="window.reaction.returnToMenu()">Back</button>
-                </div>`;
+            container.innerHTML = window.renderEmptyHistory({
+                drillName: 'Reaction Test',
+                backAction: 'window.reaction.returnToMenu()'
+            });
             return;
         }
 
-        const rows = history.map((h, i) => `
+        const archive = history.find(h => h && h._compacted === true);
+        const recent = history.filter(h => h && typeof h === 'object' && h._compacted !== true);
+        const historyOffset = archive ? Number(archive.sessionCount) || 0 : 0;
+        const compactedRow = window.renderCompactedHistoryRow(archive, 7, group => {
+            const reaction = window.getCompactedMetric(group, 'average');
+            const averageText = reaction ? `${Math.round(reaction.average)} ms average • ${Math.round(reaction.min)} ms best` : 'No timing data';
+            return `<div class="compacted-history-group">
+                <strong>${window.escapeHTML(group.label)}</strong><br>
+                ${group.sessionCount} runs • ${averageText}
+            </div>`;
+        });
+
+        const rows = recent.slice().reverse().map((h, i) => `
             <tr>
-                <td>${i+1}</td>
+                <td>${historyOffset + recent.length - i}</td>
                 <td>${h.date}</td>
                 <td>${h.official ? '★ Official' : '-'}</td>
-                <td>${h.rounds}${h.falseStartEnabled ? " (false-start on)" : ""}</td>
+                <td>${h.rounds}${h.falseStartEnabled ? " (false start on)" : ""}</td>
                 <td>${h.average} ms</td>
                 <td>${h.bracket}</td>
                 <td>${h.times.join(', ')}</td>
             </tr>
         `).join('');
 
-        container.innerHTML = `
-            <div style="max-width:95%; margin:auto; color:#e0e1dd;">
-                <h2 style="text-align:center;">Reaction Test History</h2>
-                <div style="max-height:70vh; overflow-y:auto;">
-                    <table class="results-table">
-                        <tr>
-                            <th>#</th><th>Date</th><th>Mode</th><th>Config</th><th>Average</th><th>Bracket</th><th>Times</th>
-                        </tr>
-                        ${rows}
-                    </table>
-                </div>
-                <div style="text-align:center; margin-top:10px;">
-                    <button onclick="window.reaction.returnToMenu()">Back</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderHistoryScreen({
+            drillName: 'Reaction Test',
+            headers: ['#', 'Date', 'Mode', 'Config', 'Average', 'Bracket', 'Times'],
+            rows,
+            compactedRow,
+            recentCount: recent.length,
+            archivedCount: historyOffset,
+            backAction: 'window.reaction.returnToMenu()'
+        });
     },
 
     finish: function() {
@@ -278,9 +291,8 @@ window.reaction = {
         this.showResultsOverlay(results);
         this.endCallback(results);
 
-        // history
-        const history = JSON.parse(localStorage.getItem('reaction_history') || '[]');
-        history.push({
+        // Add the result to history.
+        const historyEntry = {
             date: new Date().toLocaleString(),
             rounds: this.rounds,
             falseStartEnabled: this.falseStartEnabled,
@@ -288,8 +300,18 @@ window.reaction = {
             bracket: category.label,
             official: this.isOfficial,
             times: this.times
+        };
+        window.appendHistory('reaction_history', historyEntry, {
+            config: h => ({
+                official: !!h.official,
+                rounds: h.rounds,
+                falseStartEnabled: !!h.falseStartEnabled
+            }),
+            label: h => `${h.official ? '★ Official' : 'Custom'} • ${h.rounds} rounds • false-start ${h.falseStartEnabled ? 'on' : 'off'}`,
+            metrics: {
+                average: h => Number.isFinite(h.average) ? h.average : null
+            }
         });
-        localStorage.setItem('reaction_history', JSON.stringify(history));
     },
 
     showPopupMessage: function(text) {
@@ -304,54 +326,23 @@ window.reaction = {
         setTimeout(()=>msg.remove(), 1500);
     },
     
-    showTemporaryMessage: function(text, color = "#ff4d4d") {
-        const box = document.getElementById('reaction-box');
-        if (!box) return;  // safe check
-
-        // remove any existing message first so they never stack/linger
-        this.clearTemporaryMessage();
-
-        let msg = document.createElement("div");
-        msg.id = 'reaction-msg';
-        msg.textContent = text;
-        msg.style.cssText = `
-            position:absolute;
-            top:50%;left:50%;
-            transform:translate(-50%,-50%);
-            background:rgba(0,0,0,0.6);
-            color:${color};
-            padding:6px 12px;
-            border-radius:6px;
-            font-weight:bold;
-            z-index:1000;
-            font-size:1.2em;
-            pointer-events:none;
-            backdrop-filter:saturate(120%) blur(0.5px);
-        `;
-
-        box.style.position = 'relative';
-        box.appendChild(msg);
-        // fast: ~350ms visible, ~150ms fade
-        this._msgHideId = setTimeout(() => {
-            msg.style.transition = "opacity 0.15s";
-            msg.style.opacity = "0";
-            this._msgRemoveId = setTimeout(() => msg.remove(), 150);
-        }, 350);
+    showTemporaryMessage: function(text, type = "error") {
+        window.showGameFeedback({
+            type,
+            message: text,
+            duration: 420,
+            pulseTarget: '#reaction-box'
+        });
     },
 
-    // immediately remove any temporary message (called when a new signal/round starts)
+    // Remove the temporary message when a new signal or round starts.
     clearTemporaryMessage: function() {
-        if (this._msgHideId) { clearTimeout(this._msgHideId); this._msgHideId = null; }
-        if (this._msgRemoveId) { clearTimeout(this._msgRemoveId); this._msgRemoveId = null; }
-        const existing = document.getElementById('reaction-msg');
-        if (existing) existing.remove();
+        window.clearGameFeedback();
     },
 
     showResultsOverlay: function(results) {
         const container = document.getElementById('game-container');
         const category = this.getCategoryForMs(results.average);
-
-        // benchmark ranges
         const benchmarks = [
             { label: "On The Top", range: "≤ 130 ms", color: "#00e5ff" },
             { label: "Elite", range: "131-150 ms", color: "#4caf50" },
@@ -360,74 +351,52 @@ window.reaction = {
             { label: "Average", range: "200-260 ms", color: "#ff9800" },
             { label: "Below Average", range: "> 260 ms", color: "#f44336" }
         ];
-
-        // create benchmark HTML
-        const benchmarkHTML = `
-            <div class="badge-stack">
-                ${benchmarks.map(b => `
-                    <div class="tier-badge" style="background:${b.color}">
-                        <strong>${b.label}</strong>
-                        <small>${b.range}</small>
-                    </div>
-                `).join("")}
-            </div>
-        `;
-
-        // table with results
+        const falseStartCount = (results.falseStarts || []).filter(Boolean).length;
+        const best = results.times.filter(Number.isFinite).length
+            ? Math.min(...results.times.filter(Number.isFinite))
+            : null;
         const timesHTML = results.times.map((t, i) => {
             const failed = results.falseStarts && results.falseStarts[i];
-            const timeDisplay = t !== null ? `${t} ms` : '';
-            const marker = failed ? '<span style="color:orange; font-size:1.2em; vertical-align:middle; margin-left:6px;">●</span>' : '';
             return `<tr>
-                        <td>Round ${i + 1}</td>
-                        <td style="padding-left:20px;">
-                            ${timeDisplay}${marker}
-                        </td>
-                    </tr>`;
+                <td>${i + 1}</td>
+                <td>${Number.isFinite(t) ? `${t} ms` : '-'}</td>
+                <td><span class="result-status ${failed ? 'result-status-warning' : 'result-status-success'}">${failed ? 'False start' : 'Clean'}</span></td>
+            </tr>`;
         }).join("");
 
-        // render
-        container.innerHTML = `
-            <div style="text-align:center;color:#e0e1dd;">
-                <h2>Reaction Test${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
-
-                <div class="results-layout">
-                    <!-- LEFT column -->
-                    <div class="column-left">
-                        ${benchmarkHTML}
-                    </div>
-
-                    <!-- vertical separator -->
-                    <div class="column-separator"></div>
-
-                    <!-- RIGHT column -->
-                    <div class="column-right">
-                        <div class="current-result-badge" style="background:${category.color}">
-                            <strong>${category.label}</strong>
-                            <small>${category.range}</small>
-                        </div>
-
-                        <div style="max-height:280px; overflow-y:auto; width:100%;">
-                            <table style="margin:0 auto;border-collapse:collapse;color:white;">
-                                ${timesHTML}
-                            </table>
-                        </div>
-                        <table style="margin:6px auto 0 auto;border-collapse:collapse;color:white;">
-                            <tr style="border-top:1px solid rgba(255,255,255,0.2);">
-                                <th style="padding-top:8px;text-align:left;">Average</th>
-                                <th style="padding-top:8px; text-align:right; padding-left:20px;">${results.average} ms</th>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
-
-                <!-- Buttons under both columns -->
-                <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.reaction.restartGame()">Restart</button>
-                    <button onclick="returnToMenu()">Back to Menu</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderResultScreen({
+            drillName: 'Reaction Test',
+            official: results.official,
+            primary: {
+                label: 'Average reaction time',
+                value: `${results.average} ms`,
+                hint: `Average across ${results.times.length} completed rounds`,
+                color: category.color
+            },
+            metrics: [
+                { label: 'Best round', value: best !== null ? `${best} ms` : '-' },
+                { label: 'Rounds', value: results.times.length },
+                { label: 'False starts', value: falseStartCount, tone: falseStartCount ? 'warning' : 'success' }
+            ],
+            assessment: {
+                eyebrow: 'Performance tier',
+                title: category.label,
+                description: category.range,
+                color: category.color,
+                benchmarks: benchmarks.map(benchmark => ({
+                    ...benchmark,
+                    active: benchmark.label === category.label
+                }))
+            },
+            breakdown: {
+                title: 'Round breakdown',
+                headers: ['Round', 'Reaction', 'Attempt'],
+                rows: timesHTML,
+                note: 'A false start marker means the round included bait click.'
+            },
+            restartAction: 'window.reaction.restartGame()',
+            backAction: 'returnToMenu()'
+        });
     },
 
     restartGame: function() {
@@ -444,7 +413,7 @@ window.reaction = {
           return {
             label: "On The Top",
             color: "#00e5ff",
-            range: "≤ 130 ms - exceptional; ~top 0.5% (Formula 1 drivers, top esports pros. Usually not average times but best runs in controlled environment)"
+            range: "≤ 130 ms - exceptional; ~top 0.5% (Formula 1 drivers, top esports pros. Usually NOT average times but best runs in controlled environment)"
           };
         }
         if (ms <= 150) {
@@ -483,15 +452,15 @@ window.reaction = {
     },
 
     returnToMenu: function() {
-    // stops game logic
+    // Stop the game logic.
     this.gameActive = false;
     this.cancelAllTimers();
 
-    // clear state
+    // Clear the runtime state.
     this.currentRound = 0;
     this.times = [];
     
-    // clear dom and hide container
+    // Clear the DOM and hide the game container.
     const container = document.getElementById('game-container');
     container.innerHTML = '';
     container.classList.add('hidden');

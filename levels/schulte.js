@@ -1,18 +1,18 @@
 window.schulte = {
-    // settings (overridden by saved)
-    gridSize: 5,            // N for an N x N grid (3..9)
-    shuffleMode: false,     // reshuffle remaining numbers after each correct pick
-    fixationDot: false,     // show a center fixation dot
+    // Define settings. Saved settings can replace these values.
+    gridSize: 5,            // Set the number of rows and columns from 3 to 9.
+    shuffleMode: false,     // Move the remaining numbers after each correct selection.
+    fixationDot: false,     // Show a fixation point at the center.
     isOfficial: false,
     OFFICIAL: { gridSize: 5, shuffleMode: true, fixationDot: true },
     officialLabel: "Official: 5x5, shuffle on, fixation dot on",
 
-    // runtime state
-    cells: [],              // array of {value, picked} indexed by position 0..N*N-1
-    nextNumber: 1,          // the number the player must click next
-    total: 0,               // N*N
+    // Store the runtime state.
+    cells: [],              // Store {value, picked} for each grid position.
+    nextNumber: 1,          // Store the next number that the player must select.
+    total: 0,               // Store the total number of cells.
     startTime: 0,
-    splitTimes: [],         // ms taken for each number (index 0 => number 1)
+    splitTimes: [],         // Store the time for each number in milliseconds.
     lastPickTime: 0,
     errors: 0,
     endCallback: null,
@@ -20,7 +20,7 @@ window.schulte = {
     timeoutIds: [],
 
     init(endCallback) {
-        const saved = JSON.parse(localStorage.getItem('schulte_settings') || '{}');
+        const saved = window.readStoredJSON('schulte_settings', {});
         this.gridSize = (saved.gridSize >= 3 && saved.gridSize <= 9) ? saved.gridSize : 5;
         this.shuffleMode = !!saved.shuffleMode;
         this.fixationDot = !!saved.fixationDot;
@@ -36,25 +36,37 @@ window.schulte = {
 
     renderSettingsPanel() {
         const panel = document.getElementById('level-specific-settings');
-        let opts = '';
-        for (let n = 3; n <= 9; n++) {
-            opts += `<option value="${n}" ${this.gridSize === n ? 'selected' : ''}>${n} x ${n}</option>`;
-        }
-        panel.innerHTML = `
-            <label>Grid size:
-                <select id="schulte-grid">${opts}</select>
-            </label><br><br>
-            <label>
-                <input type="checkbox" id="schulte-shuffle" ${this.shuffleMode ? 'checked' : ''}>
-                Shuffle remaining after each pick
-            </label><br><br>
-            <label>
-                <input type="checkbox" id="schulte-fixation" ${this.fixationDot ? 'checked' : ''}>
-                Show center fixation dot
-            </label><br><br>
-            <button style="border:1px solid #0A0A23;" onclick="window.schulte.saveSettings()">Save Settings</button>
-            <button style="margin-left:6px;border:1px solid #0A0A23;" onclick="window.schulte.showHistory()">View History</button>
-        `;
+        panel.innerHTML = window.renderLevelSettings({
+            fields: [
+                {
+                    type: 'select',
+                    id: 'schulte-grid',
+                    label: 'Grid size',
+                    note: 'Choose from 3 × 3 through 9 × 9',
+                    options: Array.from({ length: 7 }, (_, index) => index + 3).map(size => ({
+                        value: size,
+                        label: `${size} × ${size}`,
+                        selected: this.gridSize === size
+                    }))
+                },
+                {
+                    type: 'checkbox',
+                    id: 'schulte-shuffle',
+                    label: 'Shuffle remaining numbers',
+                    note: 'Reshuffle after every correct pick',
+                    checked: this.shuffleMode
+                },
+                {
+                    type: 'checkbox',
+                    id: 'schulte-fixation',
+                    label: 'Center fixation dot',
+                    note: 'Supports peripheral search practice',
+                    checked: this.fixationDot
+                }
+            ],
+            saveAction: 'window.schulte.saveSettings()',
+            historyAction: 'window.schulte.showHistory()'
+        });
     },
 
     saveSettings() {
@@ -78,27 +90,33 @@ window.schulte = {
     showInstruction() {
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
-        container.innerHTML = `
-            <div style="text-align:center;max-width:600px;margin:auto;">
-                <h2>Schulte Table</h2>
-                <p>
-                    Find and click the numbers in order, starting at <strong>1</strong>.<br>
-                    ${this.fixationDot ? 'Keep your eyes on the <strong>center dot</strong> and find numbers with your peripheral vision.<br>' : ''}
-                    ${this.shuffleMode ? 'Shuffle mode is <strong>on</strong>: remaining numbers reshuffle after each correct pick.<br>' : ''}
-                    Wrong clicks flash red and count as errors. Your time is measured from the first number.<br>
-                    Grid: ${this.gridSize} x ${this.gridSize} (${this.gridSize * this.gridSize} numbers).
-                </p>
-                <div style="display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.schulte.isOfficial=false;window.schulte.startGame()">Start</button>
-                    <button onclick="window.schulte.startOfficial()">Start Official</button>
-                    <button onclick="window.schulte.returnToMenu()">Back to Menu</button>
-                </div>
-                <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
-            </div>
-        `;
+        container.innerHTML = window.renderInstructionScreen({
+            drillName: 'Schulte Table',
+            summary: 'Train visual search speed, scanning discipline, and peripheral awareness.',
+            steps: [
+                'Find and click every number in ascending order, beginning with 1.',
+                this.fixationDot
+                    ? 'Keep your gaze near the center dot and locate numbers with your peripheral vision.'
+                    : 'Scan the full grid while keeping your search path controlled.',
+                this.shuffleMode
+                    ? 'After each correct pick, the remaining numbers reshuffle into new positions.'
+                    : 'The grid stays fixed; wrong clicks flash red and count as errors.'
+            ],
+            setup: [
+                { label: 'Grid', value: `${this.gridSize} × ${this.gridSize}` },
+                { label: 'Numbers', value: this.gridSize * this.gridSize },
+                { label: 'Shuffle', value: this.shuffleMode ? 'On' : 'Off' },
+                { label: 'Fixation', value: this.fixationDot ? 'On' : 'Off' }
+            ],
+            note: 'Your timer begins when you click 1. Wrong clicks add errors but do not stop the run.',
+            officialLabel: this.officialLabel,
+            startAction: 'window.schulte.isOfficial=false;window.schulte.startGame()',
+            officialAction: 'window.schulte.startOfficial()',
+            backAction: 'window.schulte.returnToMenu()'
+        });
     },
 
-    // load the fixed official preset (bypasses saved settings) and start
+    // Apply the fixed official preset. Do not use saved settings.
     startOfficial() {
         this.isOfficial = true;
         this.gridSize = this.OFFICIAL.gridSize;
@@ -107,7 +125,7 @@ window.schulte = {
         this.startGame();
     },
 
-    // fisher-yates shuffle of an array (in place)
+    // Shuffle the array in place with the Fisher-Yates algorithm.
     shuffleArray(arr) {
         for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -116,14 +134,14 @@ window.schulte = {
         return arr;
     },
 
-    // returns a new array that is a DERANGEMENT of values
-    // a random reordering where no element ends up at the index it started at
+    // Return a new array with values in different positions.
+    // Do not keep a value at its original index.
     derange(values) {
         const n = values.length;
         if (n < 2) return values.slice();
 
-        // try random shuffles until we get one with no fixed point
-        // the expected number of attempts is small (under 3 i think, but capped just to be safe)
+        // Try random shuffles until no value remains at its original index.
+        // Stop after 50 attempts.
         for (let attempt = 0; attempt < 50; attempt++) {
             const shuffled = this.shuffleArray(values.slice());
             let ok = true;
@@ -133,8 +151,8 @@ window.schulte = {
             if (ok) return shuffled;
         }
 
-        // fallback (unlikely to be needed)
-        // a single rotation guarantees no element stays in place for n >= 2
+        // Use one rotation if the random attempts do not succeed.
+        // For two or more values, this rotation moves every value.
         const rotated = values.slice();
         const last = rotated.pop();
         rotated.unshift(last);
@@ -142,6 +160,7 @@ window.schulte = {
     },
 
     startGame() {
+        window.lockSettingsForRun();
         this.total = this.gridSize * this.gridSize;
         this.nextNumber = 1;
         this.splitTimes = [];
@@ -150,15 +169,15 @@ window.schulte = {
         this.timeoutIds.forEach(id => clearTimeout(id));
         this.timeoutIds = [];
 
-        // build cells: numbers 1->total placed in random positions
+        // Put the numbers from 1 through total in random cells.
         const values = this.shuffleArray(Array.from({ length: this.total }, (_, i) => i + 1));
         this.cells = values.map(v => ({ value: v, picked: false }));
 
         this.renderArena();
 
-        // countdown, then start the timer
-        const container = document.getElementById('game-container');
-        window.show321(container, 500).then(() => {
+        // Show the countdown. Then start the timer.
+        const board = document.getElementById('schulte-board');
+        window.show321(board, 500).then(() => {
             if (!this.gameActive) return;
             this.startTime = performance.now();
             this.lastPickTime = this.startTime;
@@ -168,36 +187,30 @@ window.schulte = {
     renderArena() {
         const container = document.getElementById('game-container');
         const N = this.gridSize;
-        // board sized to fit the viewport while staying square
-        container.innerHTML = `
-            <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-            <div style="text-align:center;">
-                <h3 id="schulte-status">Find: 1</h3>
-                <div id="schulte-board" style="
-                    position:relative;
-                    display:grid;
-                    grid-template-columns:repeat(${N}, 1fr);
-                    grid-template-rows:repeat(${N}, 1fr);
-                    gap:4px;
-                    width:min(80vh, 80vw);
-                    height:min(80vh, 80vw);
-                    margin:10px auto 0 auto;
-                "></div>
-            </div>
-        `;
-        document.getElementById('back-btn').onclick = () => this.returnToMenu();
+        // Fit a square board inside the viewport.
+        container.innerHTML = window.renderGameScreen({
+            drillName: 'Schulte Table',
+            mode: this.isOfficial ? 'Official' : 'Custom',
+            progressLabel: 'Find',
+            progressCurrent: 1,
+            progressTotal: this.total,
+            progressId: 'schulte-status',
+            stageHTML: `<div id="schulte-board" class="game-arena game-arena-square schulte-game-board" style="grid-template-columns:repeat(${N}, 1fr);grid-template-rows:repeat(${N}, 1fr);"></div>`,
+            hint: this.fixationDot
+                ? 'Keep your gaze near the orange ring and select the numbers in order.'
+                : 'Select every number in ascending order as quickly and accurately as possible.',
+            backAction: 'window.schulte.returnToMenu()',
+            screenClass: 'game-screen-square'
+        });
 
         const board = document.getElementById('schulte-board');
         this.renderCells(board);
 
         if (this.fixationDot) {
             const dot = document.createElement('div');
-            // ring size scales with the cell so it stays proportional to thenumbers (which are larger on smaller grids)
-            // Cell ≈ board / N
-            // board is min(80vh,80vw)
-            // Ring ≈ 55% of a cell
-            const ringSize = `calc(min(80vh, 80vw) / ${this.gridSize} * 0.55)`;
-            // hollow ring as fixation point, so the number underneath stays readable
+            // Keep the ring size proportional to the displayed cell size.
+            const ringSize = `${board.clientWidth / this.gridSize * 0.55}px`;
+            // Use a hollow fixation ring so the number under it stays visible.
             dot.style.cssText = `
                 position:absolute; left:50%; top:50%; transform:translate(-50%,-50%);
                 width:${ringSize}; height:${ringSize};
@@ -210,12 +223,12 @@ window.schulte = {
         }
     },
 
-    // (re)draw all cell buttons based on current this.cells
+    // Draw all cell buttons from the current cells array.
     renderCells(board) {
-        // remove existing cell buttons (keep the fixation dot,circle if present)
+        // Remove existing cell buttons. Keep the fixation ring if it is present.
         board.querySelectorAll('.schulte-cell').forEach(el => el.remove());
 
-        // font size scales with grid: smaller grids get bigger numbers
+        // Use larger numbers in smaller grids.
         const fontSize = Math.max(0.9, 2.6 - this.gridSize * 0.18);
 
         this.cells.forEach((cell, index) => {
@@ -231,24 +244,24 @@ window.schulte = {
                 opacity:${cell.picked ? 0.85 : 1};
                 transition:background 0.15s, color 0.15s;
             `;
-            btn.onmousedown = (e) => {
-                e.preventDefault();
+            btn.tabIndex = -1;
+            window.onPrimaryPointerDown(btn, (e) => {
                 this.handleCellClick(index);
-            };
+            });
             board.appendChild(btn);
         });
     },
 
     handleCellClick(index) {
         if (!this.gameActive) return;
-        // timer not started yet (during countdown) -> ignore
+        // Ignore clicks before the timer starts.
         if (!this.startTime) return;
 
         const cell = this.cells[index];
-        if (cell.picked) return; // already picked, ignore
+        if (cell.picked) return; // Ignore a cell that was already selected.
 
         if (cell.value === this.nextNumber) {
-            // correct pick
+            // Process a correct selection.
             const now = performance.now();
             this.splitTimes.push(Math.round(now - this.lastPickTime));
             this.lastPickTime = now;
@@ -259,7 +272,7 @@ window.schulte = {
             const board = document.getElementById('schulte-board');
 
             if (this.nextNumber > this.total) {
-                // done - re render to show the final cell highlighted, then finish
+                // Draw the final selected cell. Then finish the run.
                 this.renderCells(board);
                 this.gameActive = false;
                 const id = setTimeout(() => this.finish(), 250);
@@ -267,13 +280,13 @@ window.schulte = {
                 return;
             }
 
-            // update status
+            // Show the next required number.
             const status = document.getElementById('schulte-status');
-            if (status) status.textContent = `Find: ${this.nextNumber}`;
+            if (status) status.textContent = this.nextNumber;
 
-            // shuffle mode: rearrange the remaining (unpicked) numbers among the unpicked cells 
-            // picked cells stay in place and are highlighted
-            // remaining numbers land on a different cell than they were on
+            // In shuffle mode, move the remaining numbers between unselected cells.
+            // Keep selected cells in position and keep their highlight.
+            // Move each remaining number to a different cell.
             if (this.shuffleMode) {
                 const unpickedIndices = [];
                 const unpickedValues = [];
@@ -291,13 +304,20 @@ window.schulte = {
             }
             this.renderCells(board);
         } else {
-            // wrong pick - flash red, count error, no time penalty
+            // For a wrong selection, show red feedback and count an error.
+            // No time penalty.
             this.errors++;
             const board = document.getElementById('schulte-board');
+            window.showGameFeedback({
+                type: 'error',
+                message: `Find ${this.nextNumber}`,
+                duration: 380,
+                pulseTarget: board
+            });
             const btns = board.querySelectorAll('.schulte-cell');
             const btn = btns[index];
             if (btn) {
-                // uses a class (with !important) so the flash beats the :hover rule
+                // The error class uses !important so its color overrides :hover.
                 btn.classList.add('error');
                 const id = setTimeout(() => {
                     if (btn) btn.classList.remove('error');
@@ -328,24 +348,41 @@ window.schulte = {
         this.showResultsOverlay(results);
         this.endCallback(results);
 
-        // history
-        const history = JSON.parse(localStorage.getItem('schulte_history') || '[]');
-        history.push({
+        // Add the result to history.
+        const historyEntry = {
             date: new Date().toLocaleString(),
             gridSize: this.gridSize,
             shuffleMode: this.shuffleMode,
+            fixationDot: this.fixationDot,
             totalTimeMs: totalTime,
             perCellMs: Math.round(perCell),
             errors: this.errors,
             bracket: category.label,
             official: this.isOfficial
+        };
+        window.appendHistory('schulte_history', historyEntry, {
+            config: h => ({
+                official: !!h.official,
+                gridSize: h.gridSize,
+                shuffleMode: !!h.shuffleMode,
+                fixationDot: h.official ? true : (typeof h.fixationDot === 'boolean' ? h.fixationDot : null)
+            }),
+            label: h => {
+                const fixation = h.official ? true : h.fixationDot;
+                const fixationLabel = typeof fixation === 'boolean' ? `fixation ${fixation ? 'on' : 'off'}` : 'legacy fixation setting';
+                return `${h.official ? '★ Official' : 'Custom'} • ${h.gridSize} × ${h.gridSize} • shuffle ${h.shuffleMode ? 'on' : 'off'} • ${fixationLabel}`;
+            },
+            metrics: {
+                totalTimeMs: h => Number.isFinite(h.totalTimeMs) ? h.totalTimeMs : null,
+                perCellMs: h => Number.isFinite(h.perCellMs) ? h.perCellMs : null,
+                errors: h => Number.isFinite(h.errors) ? h.errors : null
+            }
         });
-        localStorage.setItem('schulte_history', JSON.stringify(history));
     },
 
-    // tiers on time-per-cell so they're fair across grid sizes
-    // grounded in documented 5x5 click norms: exceptional <15s, good ~20-30s, typical ~30-45s
-    // per cell (÷25): <0.6s exceptional, ~0.8 good, ~1.1-1.4 typical
+    // Base ranks on time per cell so different grid sizes are comparable.
+    // Use reference ranges for 5-by-5 grids: under 15 seconds is exceptional, 20 to 30 is good, and 30 to 45 is typical.
+    // For 25 cells, these ranges are under 0.6, approximately 0.8, and approximately 1.1 to 1.4 seconds per cell.
     getCategoryForPerCell(ms) {
         if (ms <= 600)  return { label: "Phenomenal", color: "#00e5ff", range: "≤ 0.60 s/cell - exceptional (≈15s on 5x5)" };
         if (ms <= 800)  return { label: "Elite",      color: "#4caf50", range: "0.60–0.80 s/cell - very fast (≈20s on 5x5)" };
@@ -372,65 +409,50 @@ window.schulte = {
             { label: "Average",    range: "1.40–1.80 s/cell", color: "#ff9800" },
             { label: "Developing", range: "> 1.80 s/cell", color: "#f44336" }
         ];
+        const indexed = (results.splitTimes || []).map((time, index) => ({ number: index + 1, time }));
+        const slowest = indexed.slice().sort((a, b) => b.time - a.time).slice(0, Math.min(3, indexed.length));
+        const slowestText = slowest.length
+            ? `Slowest finds: ${slowest.map(item => `#${item.number} (${(item.time / 1000).toFixed(2)} s)`).join(', ')}`
+            : '';
+        const rows = indexed.map(item => `
+            <tr><td>${item.number}</td><td>${(item.time / 1000).toFixed(2)} s</td></tr>
+        `).join('');
 
-        const benchmarkHTML = `
-            <div class="badge-stack">
-                ${benchmarks.map(b => `
-                    <div class="tier-badge" style="background:${b.color}">
-                        <strong>${b.label}</strong>
-                        <small>${b.range}</small>
-                    </div>
-                `).join("")}
-            </div>
-        `;
-
-        // slowest few numbers (helpful feedback)
-        let slowestHTML = '';
-        if (results.splitTimes && results.splitTimes.length) {
-            const indexed = results.splitTimes.map((t, i) => ({ num: i + 1, t }));
-            indexed.sort((a, b) => b.t - a.t);
-            const top = indexed.slice(0, Math.min(3, indexed.length));
-            slowestHTML = `
-                <div style="margin-top:10px; font-size:0.9em; opacity:0.9;">
-                    Slowest finds: ${top.map(x => `#${x.num} (${(x.t/1000).toFixed(2)}s)`).join(', ')}
-                </div>
-            `;
-        }
-
-        container.innerHTML = `
-            <div style="text-align:center;color:#e0e1dd;">
-                <h2>Schulte Table${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
-                <div class="results-layout">
-                    <div class="column-left">
-                        ${benchmarkHTML}
-                    </div>
-                    <div class="column-separator"></div>
-                    <div class="column-right">
-                        <div class="current-result-badge" style="background:${category.color}">
-                            <strong>${category.label}</strong>
-                            <small>${category.range}</small>
-                        </div>
-                        <table style="margin:0 auto;border-collapse:collapse;color:white;">
-                            <tr><td style="text-align:left;">Grid</td>
-                                <td style="text-align:right;padding-left:20px;">${results.gridSize} x ${results.gridSize}</td></tr>
-                            <tr><td style="text-align:left;">Shuffle</td>
-                                <td style="text-align:right;padding-left:20px;">${results.shuffleMode ? 'On' : 'Off'}</td></tr>
-                            <tr><td style="text-align:left;">Total time</td>
-                                <td style="text-align:right;padding-left:20px;">${this.formatTime(results.totalTimeMs)}</td></tr>
-                            <tr><td style="text-align:left;">Per cell</td>
-                                <td style="text-align:right;padding-left:20px;">${(results.perCellMs/1000).toFixed(2)} s</td></tr>
-                            <tr><td style="text-align:left;">Errors</td>
-                                <td style="text-align:right;padding-left:20px;">${results.errors}</td></tr>
-                        </table>
-                        ${slowestHTML}
-                    </div>
-                </div>
-                <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.schulte.restartGame()">Restart</button>
-                    <button onclick="returnToMenu()">Back to Menu</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderResultScreen({
+            drillName: 'Schulte Table',
+            official: results.official,
+            primary: {
+                label: 'Total completion time',
+                value: this.formatTime(results.totalTimeMs),
+                hint: `${results.gridSize} × ${results.gridSize} grid`,
+                color: category.color
+            },
+            metrics: [
+                { label: 'Time per cell', value: `${(results.perCellMs / 1000).toFixed(2)} s` },
+                { label: 'Errors', value: results.errors, tone: results.errors ? 'warning' : 'success' },
+                { label: 'Grid', value: `${results.gridSize} × ${results.gridSize}` },
+                { label: 'Shuffle', value: results.shuffleMode ? 'On' : 'Off' }
+            ],
+            assessment: {
+                eyebrow: 'Performance tier',
+                title: category.label,
+                description: category.range,
+                color: category.color,
+                benchmarks: benchmarks.map(benchmark => ({
+                    ...benchmark,
+                    active: benchmark.label === category.label
+                })),
+                footer: slowestText
+            },
+            breakdown: {
+                title: 'Find-time breakdown',
+                headers: ['Number', 'Find time'],
+                rows,
+                note: 'Each split measures the time since the previous correct number.'
+            },
+            restartAction: 'window.schulte.restartGame()',
+            backAction: 'returnToMenu()'
+        });
     },
 
     restartGame() {
@@ -442,21 +464,34 @@ window.schulte = {
     },
 
     showHistory() {
-        const history = JSON.parse(localStorage.getItem('schulte_history') || '[]');
+        const history = window.readStoredJSON('schulte_history', []);
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
 
         if (!history.length) {
-            container.innerHTML = `
-                <div style="text-align:center; margin-top:20px;">
-                    <h3>No history found</h3>
-                    <button onclick="window.schulte.showInstruction()">Back</button>
-                </div>
-            `;
+            container.innerHTML = window.renderEmptyHistory({
+                drillName: 'Schulte Table',
+                backAction: 'window.schulte.showInstruction()'
+            });
             return;
         }
 
-        const rows = history.slice().reverse().map(h => `
+        const archive = history.find(h => h && h._compacted === true);
+        const recent = history.filter(h => h && typeof h === 'object' && h._compacted !== true);
+        const archivedCount = archive ? Number(archive.sessionCount) || 0 : 0;
+        const compactedRow = window.renderCompactedHistoryRow(archive, 8, group => {
+            const total = window.getCompactedMetric(group, 'totalTimeMs');
+            const perCell = window.getCompactedMetric(group, 'perCellMs');
+            const errors = window.getCompactedMetric(group, 'errors');
+            return `<div class="compacted-history-group">
+                <strong>${window.escapeHTML(group.label)}</strong><br>
+                ${group.sessionCount} runs • ${total ? (total.average / 1000).toFixed(2) + ' s average' : '-'} •
+                ${perCell ? (perCell.average / 1000).toFixed(2) + ' s/cell average / ' + (perCell.min / 1000).toFixed(2) + ' s best' : '-'} •
+                ${errors ? errors.average.toFixed(1) : '0'} errors/run
+            </div>`;
+        });
+
+        const rows = recent.slice().reverse().map(h => `
             <tr>
                 <td>${h.date}</td>
                 <td>${h.official ? '★ Official' : '-'}</td>
@@ -469,20 +504,15 @@ window.schulte = {
             </tr>
         `).join('');
 
-        container.innerHTML = `
-            <div style="text-align:center; max-width:760px; margin:auto;">
-                <h2>Schulte - History</h2>
-                <div style="max-height:60vh; overflow-y:auto;">
-                    <table class="results-table">
-                        <tr><th>Date</th><th>Mode</th><th>Grid</th><th>Shuffle</th><th>Time</th><th>Per cell</th><th>Errors</th><th>Tier</th></tr>
-                        ${rows}
-                    </table>
-                </div>
-                <div style="margin-top:14px;">
-                    <button onclick="window.schulte.showInstruction()">Back</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderHistoryScreen({
+            drillName: 'Schulte Table',
+            headers: ['Date', 'Mode', 'Grid', 'Shuffle', 'Time', 'Per cell', 'Errors', 'Tier'],
+            rows,
+            compactedRow,
+            recentCount: recent.length,
+            archivedCount,
+            backAction: 'window.schulte.showInstruction()'
+        });
     },
 
     showPopupMessage(text) {

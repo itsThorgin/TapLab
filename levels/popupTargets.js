@@ -5,7 +5,7 @@ window.popupTargets = {
     falseTargetChance: 0.25,
     isOfficial: false,
     OFFICIAL: { count: 25, size: 10, falseTarget: true, falseChance: 0.3 },
-    officialLabel: "Official: 25 targets, 10px, false-targets on (0.3)",
+    officialLabel: "Official: 25 targets, 10px, false targets on (0.3)",
     currentIndex: 0,
     times: [],
     hoverTimes: [],
@@ -14,15 +14,18 @@ window.popupTargets = {
     falseHits: [],
     spawnTime: 0,
     hoverTime: null,
+    targetReady: false,
     endCallback: null,
     gameActive: false,
 
     init: function(endCallback) {
-        const savedSettings = JSON.parse(localStorage.getItem('popupTargets_settings')) || {};
+        const savedSettings = window.readStoredJSON('popupTargets_settings', {});
         this.targetCount = savedSettings.count || 10;
         this.targetSize = savedSettings.size || 25;
         this.falseTargetEnabled = savedSettings.falseTarget || false;
-        this.falseTargetChance = savedSettings.falseChance || 0.25;
+        this.falseTargetChance = Number.isFinite(savedSettings.falseChance)
+            ? Math.min(1, Math.max(0, savedSettings.falseChance))
+            : 0.25;
 
         this.endCallback = endCallback;
         this.currentIndex = 0;
@@ -31,6 +34,7 @@ window.popupTargets = {
         this.clickDelays = [];
         this.misses = [];
         this.falseHits = [];
+        this.targetReady = false;
         this.gameActive = false;
         this.isOfficial = false;
 
@@ -40,57 +44,62 @@ window.popupTargets = {
 
     renderSettingsPanel: function() {
         const panel = document.getElementById('level-specific-settings');
-        panel.innerHTML = `
-            <label>Number of targets: 
-                <input type="number" id="popup-count" min="5" max="50" value="${this.targetCount}">
-            </label><br><br>
-            <label>Target size: 
-                <select id="popup-size">
-                    <option value="25" ${this.targetSize==25?'selected':''}>25 px</option>
-                    <option value="20" ${this.targetSize==20?'selected':''}>20 px</option>
-                    <option value="15" ${this.targetSize==15?'selected':''}>15 px</option>
-                    <option value="10" ${this.targetSize==10?'selected':''}>10 px</option>
-                    <option value="5"  ${this.targetSize==5?'selected':''}>5 px</option>
-                </select>
-            </label><br><br>
-            <label>
-                <input type="checkbox" id="popup-false-target" ${this.falseTargetEnabled ? 'checked' : ''}>
-                Enable False Target Trick
-            </label><br><br>
-            <label>False target chance: 
-                <input type="number" id="popup-false-chance" min="0" max="1" step="0.05" value="${this.falseTargetChance}">
-            </label><br><br>
-            <button style="border: 1px solid #0A0A23;" onclick="window.popupTargets.saveSettings()">Save Settings</button>
-            <button style="margin-left:6px; border:1px solid #0A0A23;" onclick="window.popupTargets.showHistory()">View History</button>
-        `;
+        panel.innerHTML = window.renderLevelSettings({
+            fields: [
+                { type: 'number', id: 'popup-count', label: 'Number of targets', note: 'Choose from 5 to 50', min: 5, max: 50, value: this.targetCount },
+                {
+                    type: 'select', id: 'popup-size', label: 'Target size', note: 'Smaller targets demand more precision',
+                    options: [25, 20, 15, 10, 5].map(size => ({ value: size, label: `${size} px`, selected: this.targetSize === size }))
+                },
+                { type: 'checkbox', id: 'popup-false-target', label: 'False Target Trick', note: 'Orange targets should be ignored', checked: this.falseTargetEnabled },
+                { type: 'number', id: 'popup-false-chance', label: 'False target chance', note: '0 to 1 probability', min: 0, max: 1, step: 0.05, value: this.falseTargetChance }
+            ],
+            saveAction: 'window.popupTargets.saveSettings()',
+            historyAction: 'window.popupTargets.showHistory()'
+        });
     },
 
     showHistory: function() {
-        const history = JSON.parse(localStorage.getItem('popupTargets_history') || '[]');
+        const history = window.readStoredJSON('popupTargets_history', []);
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
 
         if (!history.length) {
-            container.innerHTML = `
-                <div style="text-align:center; margin-top:20px;">
-                    <h3>No history found</h3>
-                    <button onclick="window.popupTargets.returnToMenu()">Back</button>
-                </div>
-            `;
+            container.innerHTML = window.renderEmptyHistory({
+                drillName: 'Pop-up Targets',
+                backAction: 'window.popupTargets.returnToMenu()'
+            });
             return;
         }
 
-        let rows = history.map((h, idx) => {
-            const missList = h.misses.map((m, i) => m ? `T${i+1}: ${m}` : null).filter(Boolean).join(', ') || 'None';
-            const falseList = h.falseHits.map((f, i) => f ? `T${i+1}: ${f}` : null).filter(Boolean).join(', ') || 'None';
+        const archive = history.find(h => h && h._compacted === true);
+        const recent = history.filter(h => h && typeof h === 'object' && h._compacted !== true);
+        const historyOffset = archive ? Number(archive.sessionCount) || 0 : 0;
+        const compactedRow = window.renderCompactedHistoryRow(archive, 10, group => {
+            const hover = window.getCompactedMetric(group, 'avgHover');
+            const click = window.getCompactedMetric(group, 'avgClick');
+            const total = window.getCompactedMetric(group, 'avgTotal');
+            const misses = window.getCompactedMetric(group, 'missesTotal');
+            const falseHits = window.getCompactedMetric(group, 'falseHitsTotal');
+            return `<div class="compacted-history-group">
+                <strong>${window.escapeHTML(group.label)}</strong><br>
+                ${group.sessionCount} runs • hover ${hover ? Math.round(hover.average) + ' ms' : '-'} •
+                click ${click ? Math.round(click.average) + ' ms' : '-'} • total ${total ? Math.round(total.average) + ' ms' : '-'} •
+                ${misses ? misses.average.toFixed(1) : '0'} misses/run • ${falseHits ? falseHits.average.toFixed(1) : '0'} false hits/run
+            </div>`;
+        });
+
+        let rows = recent.slice().reverse().map((h, idx) => {
+            const missList = (h.misses || []).map((m, i) => m ? `T${i+1}: ${m}` : null).filter(Boolean).join(', ') || 'None';
+            const falseList = (h.falseHits || []).map((f, i) => f ? `T${i+1}: ${f}` : null).filter(Boolean).join(', ') || 'None';
             return `
                 <tr>
-                    <td>${idx+1}</td>
+                    <td>${historyOffset + recent.length - idx}</td>
                     <td>${h.date}</td>
                     <td>${h.official ? '★ Official' : '-'}</td>
                     <td>${h.targetCount} × ${h.targetSize}px</td>
-                    <td>${h.avgHover} ms</td>
-                    <td>${h.avgClick} ms</td>
+                    <td>${Number.isFinite(h.avgHover) ? h.avgHover + ' ms' : '-'}</td>
+                    <td>${Number.isFinite(h.avgClick) ? h.avgClick + ' ms' : '-'}</td>
                     <td>${h.avgTotal} ms</td>
                     <td>${(h.totalSessionTime/1000).toFixed(2)} s</td>
                     <td>${missList}</td>
@@ -99,24 +108,15 @@ window.popupTargets = {
             `;
         }).join('');
 
-        container.innerHTML = `
-            <div style="max-width:95%; margin:auto; color:#e0e1dd;">
-                <h2 style="text-align:center;">Popup Targets History</h2>
-                <div style="max-height:70vh; overflow-y:auto;">
-                    <table class="results-table">
-                        <tr>
-                            <th>#</th><th>Date</th><th>Mode</th><th>Config</th>
-                            <th>Avg Hover</th><th>Avg Click</th><th>Avg Total</th>
-                            <th>Total Time</th><th>Misses</th><th>False Hits</th>
-                        </tr>
-                        ${rows}
-                    </table>
-                </div>
-                <div style="text-align:center; margin-top:10px;">
-                    <button onclick="window.popupTargets.returnToMenu()">Back</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderHistoryScreen({
+            drillName: 'Pop-up Targets',
+            headers: ['#', 'Date', 'Mode', 'Config', 'Avg Hover', 'Avg Click', 'Avg Total', 'Total Time', 'Misses', 'False Hits'],
+            rows,
+            compactedRow,
+            recentCount: recent.length,
+            archivedCount: historyOffset,
+            backAction: 'window.popupTargets.returnToMenu()'
+        });
     },
 
     saveSettings: function() {
@@ -138,25 +138,28 @@ window.popupTargets = {
     showInstruction: function() {
         const container = document.getElementById('game-container');
         container.classList.remove('hidden');
-        container.innerHTML = `
-            <div style="text-align:center; max-width:600px; margin:auto;">
-                <h2>Pop-up Targets</h2>
-                <p>
-                    Move your mouse to each target and click it as fast as possible.<br>
-                    Tracks time to hover over target, click delay, total hit time, misses, and false hits.<br>
-                    ${this.targetCount} targets total.
-                </p>
-                <div style="display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.popupTargets.isOfficial=false;window.popupTargets.startGame()">Start</button>
-                    <button onclick="window.popupTargets.startOfficial()">Start Official</button>
-                    <button onclick="window.popupTargets.returnToMenu()">Back to Menu</button>
-                </div>
-                <div style="margin-top:8px; font-size:0.82em; opacity:0.75;">${this.officialLabel}</div>
-            </div>
-        `;
+        container.innerHTML = window.renderInstructionScreen({
+            drillName: 'Pop-up Targets',
+            summary: 'Train fast pointer acquisition by moving to and clicking targets as they appear.',
+            steps: [
+                'Move the pointer onto each teal target as quickly as possible.',
+                'Click once you are on the target.',
+                this.falseTargetEnabled ? 'Ignore orange false targets; clicking one counts as a false hit.' : 'Continue until every target has been completed.'
+            ],
+            setup: [
+                { label: 'Targets', value: this.targetCount },
+                { label: 'Target size', value: `${this.targetSize} px` },
+                { label: 'False targets', value: this.falseTargetEnabled ? `On • ${this.falseTargetChance}` : 'Off' }
+            ],
+            note: 'TapLab records hover time, click delay, end-to-end total, misses, and false hits.',
+            officialLabel: this.officialLabel,
+            startAction: 'window.popupTargets.isOfficial=false;window.popupTargets.startGame()',
+            officialAction: 'window.popupTargets.startOfficial()',
+            backAction: 'window.popupTargets.returnToMenu()'
+        });
     },
 
-    // load the fixed official preset (bypasses saved settings) and start.
+    // Apply the fixed official preset. Do not use saved settings.
     startOfficial: function() {
         this.isOfficial = true;
         this.targetCount = this.OFFICIAL.count;
@@ -167,67 +170,49 @@ window.popupTargets = {
     },
 
     startGame: function() {
+        window.lockSettingsForRun();
         this.currentIndex = 0;
         this.times = [];
         this.hoverTimes = [];
         this.clickDelays = [];
         this.misses = [];
         this.falseHits = [];
+        this.targetReady = false;
         this.gameActive = true;
 
         const container = document.getElementById('game-container');
-        container.innerHTML = `
-            <button id="back-btn" style="position:absolute; top:10px; left:10px;">← Back</button>
-            <div id="popup-area" style="position:relative; width:60vw; aspect-ratio:16/9; background:#6c757d; border-radius:8px; overflow:hidden; margin:auto;"></div>
-        `;
-        document.getElementById('back-btn').onclick = () => this.returnToMenu();
+        container.innerHTML = window.renderGameScreen({
+            drillName: 'Pop-up Targets',
+            mode: this.isOfficial ? 'Official' : 'Custom',
+            progressLabel: 'Target',
+            progressCurrent: 1,
+            progressTotal: this.targetCount,
+            progressId: 'popup-idx',
+            stageHTML: '<div id="popup-area" class="game-arena game-arena-wide"></div>',
+            hint: this.falseTargetEnabled
+                ? 'Click teal targets. Ignore orange false targets.'
+                : 'Acquire each target, move onto it, and click.',
+            backAction: 'window.popupTargets.returnToMenu()'
+        });
 
         const area = document.getElementById('popup-area');
 
-        // count misses
-        area.addEventListener('mousedown', (e) => {
+        // Count missed clicks.
+        window.onPrimaryPointerDown(area, (e) => {
             if (!this.gameActive) return;
             if (this.inCountdown) return;
             if (!e.target.id || (e.target.id !== 'popup-target' && e.target.id !== 'false-target')) {
                 this.misses[this.currentIndex] = (this.misses[this.currentIndex] || 0) + 1;
-                this.showTemporaryMessage("Miss!", "#ff4d4d");
+                this.showTemporaryMessage("Miss", "error");
             }
         });
 
         this.inCountdown = true;
         window.show321(area, 500).then(() => {
+            if (!this.gameActive) return;
             this.inCountdown = false;
             this.spawnTarget();
         });
-        
-        const sequence = ["3", "2", "1", "Go!"];
-        let step = 0;
-
-        this.inCountdown = true;
-
-        const showStep = () => {
-            countdownOverlay.textContent = sequence[step];
-            countdownOverlay.style.opacity = "1";
-            countdownOverlay.style.transform = "translate(-50%,-50%) scale(1.2)";
-        
-            setTimeout(() => {
-                countdownOverlay.style.opacity = "0";
-                countdownOverlay.style.transform = "translate(-50%,-50%) scale(1)";
-            }, 300); // fade out after 0.3s
-        
-            step++;
-            if (step < sequence.length) {
-                setTimeout(showStep, 500); // move to next number
-            } else {
-                setTimeout(() => {
-                    countdownOverlay.remove();
-                    this.inCountdown = false;
-                    this.spawnTarget();
-                }, 500);
-            }
-        };
-
-        showStep();
     },
     
     spawnTarget: function(forceRealNext = false) {
@@ -235,11 +220,11 @@ window.popupTargets = {
         const area = document.getElementById('popup-area');
         if (!area) return;
         area.innerHTML = '';
+        this.targetReady = false;
+        const progress = document.getElementById('popup-idx');
+        if (progress) progress.textContent = Math.min(this.currentIndex + 1, this.targetCount);
 
         const spawnFalse = !forceRealNext && this.falseTargetEnabled && Math.random() < this.falseTargetChance;
-
-        this.spawnTime = performance.now();
-        this.hoverTime = null;
 
         if (spawnFalse) {
             const falseTarget = document.createElement('div');
@@ -256,43 +241,33 @@ window.popupTargets = {
             falseTarget.style.left = `${Math.random() * maxX}px`;
             falseTarget.style.top  = `${Math.random() * maxY}px`;
                     
-            // miss if clicking elsewhere while it's visible
-            const missHandler = (e) => {
-              if (e.target.id !== 'false-target') {
-                this.misses[this.currentIndex] = (this.misses[this.currentIndex] || 0) + 1;
-                this.showTemporaryMessage("Miss!", "#ff4d4d");
-              }
-            };
-            area.addEventListener('mousedown', missHandler);
-        
             area.appendChild(falseTarget);
         
             let cleaned = false;
             const cleanup = () => {
               if (cleaned) return;
               cleaned = true;
-              area.removeEventListener('mousedown', missHandler);
               if (!this.gameActive) return;
-              // move to a REAL target, no increment for currentIndex
+              // Continue with a real target. Do not increment currentIndex.
               this.spawnTarget(true);
             };
         
-            // clicking the false target counts a false hit and despawns immediately
-            falseTarget.addEventListener('mousedown', (e) => {
+            // Record a false hit and remove the false target immediately.
+            window.onPrimaryPointerDown(falseTarget, (e) => {
                 e.stopPropagation();
                 this.falseHits[this.currentIndex] = (this.falseHits[this.currentIndex] || 0) + 1;
-                this.showTemporaryMessage("False target!", "#ff4d4d");
-                setTimeout(cleanup, 0); // allows paint before respawn
+                this.showTemporaryMessage("False target", "error");
+                setTimeout(cleanup, 0); // Let the browser paint before the next target appears.
             });
         
-            // auto despawn after history based lifetime (no miss on despawn)
+            // Remove the target after its history based lifetime. Do not record a miss.
             const lifetime = this.getFalseTargetDuration();
             const tid = setTimeout(cleanup, lifetime);
         
-            return; // exit (no real target here)
+            return; // Stop because this event has no real target.
         }
 
-        // otherwise spawn REAL target
+        // Spawn a real target.
         const realTarget = document.createElement('div');
         realTarget.id = 'popup-target';
         realTarget.style.width = `${this.targetSize}px`;
@@ -301,37 +276,45 @@ window.popupTargets = {
         realTarget.style.borderRadius = '50%';
         realTarget.style.position = 'absolute';
         realTarget.style.cursor = 'pointer';
+        this.hoverTime = null;
 
         const maxX = area.clientWidth - this.targetSize;
         const maxY = area.clientHeight - this.targetSize;
         realTarget.style.left = `${Math.random() * maxX}px`;
         realTarget.style.top = `${Math.random() * maxY}px`;
 
-        realTarget.addEventListener('mouseenter', () => {
-            if (this.hoverTime === null) {
+        realTarget.addEventListener('pointerenter', (event) => {
+            if (event.pointerType === 'touch') return;
+            if (this.targetReady && this.hoverTime === null) {
                 this.hoverTime = performance.now();
             }
         });
 
-        realTarget.addEventListener('mousedown', (e) => {
-            e.stopPropagation(); // limits bubbling to false targets
+        window.onPrimaryPointerDown(realTarget, (e) => {
+            e.stopPropagation(); // Stop the false target click from reaching the arena.
             this.hitTarget();
         });
 
         area.appendChild(realTarget);
+        requestAnimationFrame(() => {
+            if (!this.gameActive || !realTarget.isConnected) return;
+            this.spawnTime = performance.now();
+            this.targetReady = true;
+        });
     },
 
     getFalseTargetDuration: function() {
-        // default 1 sec
+        // Use a default lifetime of 1 second.
         let duration = 1000;
 
-        const history = JSON.parse(localStorage.getItem('popupTargets_history') || '[]');
-        if (history.length) {
-            // using mean of past avgTotal values
+        const history = window.readStoredJSON('popupTargets_history', []);
+        const recentHistory = history.filter(h => h && h._compacted !== true && Number.isFinite(h.avgTotal));
+        if (recentHistory.length) {
+            // Use the mean of previous avgTotal values.
             const mean = Math.round(
-                history.reduce((acc, h) => acc + (Number(h.avgTotal) || 0), 0) / history.length
+                recentHistory.reduce((acc, h) => acc + h.avgTotal, 0) / recentHistory.length
             );
-            // capping false target max shown time at 2s
+            // Limit the visible time of a false target to 2 seconds.
             duration = Math.min(2000, mean || 1000);
         }
 
@@ -339,6 +322,9 @@ window.popupTargets = {
     },
 
     hitTarget: function() {
+        if (!this.gameActive || !this.targetReady) return;
+        this.targetReady = false;
+
         const now = performance.now();
         const totalTime = now - this.spawnTime;
         const hoverTime = this.hoverTime ? this.hoverTime - this.spawnTime : null;
@@ -347,19 +333,32 @@ window.popupTargets = {
         this.times.push(Math.round(totalTime));
         this.hoverTimes.push(hoverTime !== null ? Math.round(hoverTime) : null);
         this.clickDelays.push(clickDelay !== null ? Math.round(clickDelay) : null);
+        window.showGameFeedback({
+            type: 'success',
+            message: `Hit • ${Math.round(totalTime)} ms`,
+            duration: 340,
+            pulseTarget: '#popup-area'
+        });
 
         this.currentIndex++;
         if (this.currentIndex >= this.targetCount) {
             this.finish();
         } else {
-            setTimeout(() => this.spawnTarget(), 0); // moving it to next tick
+            setTimeout(() => this.spawnTarget(), 0); // Spawn the next target in the next event loop cycle.
         }
     },
 
     finish: function() {
         this.gameActive = false;
-        const avgHover = Math.round(this.hoverTimes.reduce((a,b)=>a+(b||0),0) / this.hoverTimes.length);
-        const avgClick = Math.round(this.clickDelays.reduce((a,b)=>a+(b||0),0) / this.clickDelays.length);
+        this.targetReady = false;
+        const averageMeasured = (values) => {
+            const measured = values.filter(Number.isFinite);
+            return measured.length
+                ? Math.round(measured.reduce((a, b) => a + b, 0) / measured.length)
+                : null;
+        };
+        const avgHover = averageMeasured(this.hoverTimes);
+        const avgClick = averageMeasured(this.clickDelays);
         const avgTotal = Math.round(this.times.reduce((a,b)=>a+b,0) / this.times.length);
         const totalSessionTime = this.times.reduce((a,b)=>a+b,0);
 
@@ -379,11 +378,12 @@ window.popupTargets = {
         this.showResultsOverlay(results);
         this.endCallback(results);
 
-        const history = JSON.parse(localStorage.getItem('popupTargets_history') || '[]');
-        history.push({
+        const historyEntry = {
             date: new Date().toLocaleString(),
             targetCount: this.targetCount,
             targetSize: this.targetSize,
+            falseTargetEnabled: this.falseTargetEnabled,
+            falseTargetChance: this.falseTargetChance,
             avgHover,
             avgClick,
             avgTotal,
@@ -391,50 +391,77 @@ window.popupTargets = {
             misses: this.misses,
             falseHits: this.falseHits,
             official: this.isOfficial
+        };
+        window.appendHistory('popupTargets_history', historyEntry, {
+            config: h => ({
+                official: !!h.official,
+                targetCount: h.targetCount,
+                targetSize: h.targetSize,
+                falseTargetEnabled: h.official ? true : (typeof h.falseTargetEnabled === 'boolean' ? h.falseTargetEnabled : null),
+                falseTargetChance: h.official ? 0.3 : (Number.isFinite(h.falseTargetChance) ? h.falseTargetChance : null)
+            }),
+            label: h => {
+                const falseEnabled = h.official ? true : h.falseTargetEnabled;
+                const falseChance = h.official ? 0.3 : h.falseTargetChance;
+                const falseLabel = typeof falseEnabled === 'boolean'
+                    ? `false-target ${falseEnabled ? `on (${Number.isFinite(falseChance) ? falseChance : '?'})` : 'off'}`
+                    : 'legacy false-target setting';
+                return `${h.official ? '★ Official' : 'Custom'} • ${h.targetCount} × ${h.targetSize}px • ${falseLabel}`;
+            },
+            metrics: {
+                avgHover: h => Number.isFinite(h.avgHover) ? h.avgHover : null,
+                avgClick: h => Number.isFinite(h.avgClick) ? h.avgClick : null,
+                avgTotal: h => Number.isFinite(h.avgTotal) ? h.avgTotal : null,
+                totalSessionTime: h => Number.isFinite(h.totalSessionTime) ? h.totalSessionTime : null,
+                missesTotal: h => Array.isArray(h.misses) ? h.misses.reduce((sum, value) => sum + (Number(value) || 0), 0) : null,
+                falseHitsTotal: h => Array.isArray(h.falseHits) ? h.falseHits.reduce((sum, value) => sum + (Number(value) || 0), 0) : null
+            }
         });
-        localStorage.setItem('popupTargets_history', JSON.stringify(history));
     },
 
     showResultsOverlay: function(results) {
         const container = document.getElementById('game-container');
+        const formatMs = (value) => Number.isFinite(value) ? `${value} ms` : '-';
+        const totalMisses = (results.misses || []).reduce((sum, value) => sum + (Number(value) || 0), 0);
+        const totalFalseHits = (results.falseHits || []).reduce((sum, value) => sum + (Number(value) || 0), 0);
 
         let rows = '';
         for (let i = 0; i < results.totalTimes.length; i++) {
             rows += `<tr>
                         <td>${i+1}</td>
-                        <td>${results.hoverTimes[i] ?? '-'} ms</td>
-                        <td>${results.clickDelays[i] ?? '-'} ms</td>
+                        <td>${formatMs(results.hoverTimes[i])}</td>
+                        <td>${formatMs(results.clickDelays[i])}</td>
                         <td>${results.totalTimes[i]} ms</td>
                         <td>${results.misses[i] || 0}</td>
                         <td>${results.falseHits[i] || 0}</td>
                      </tr>`;
         }
 
-        container.innerHTML = `
-            <div style="text-align:center;color:#e0e1dd; max-width:640px; margin:auto;">
-                <h2>Pop-up Targets${results.official ? ' <span style="color:#f4d35e;">★ Official</span>' : ''}</h2>
-                <table style="margin:8px auto 10px auto;border-collapse:collapse;color:white;">
-                    <tr><td style="text-align:left;">Avg total</td>
-                        <td style="text-align:right;padding-left:24px;">${results.avgTotal} ms</td></tr>
-                    <tr><td style="text-align:left;">Avg hover</td>
-                        <td style="text-align:right;padding-left:24px;">${results.avgHover} ms</td></tr>
-                    <tr><td style="text-align:left;">Avg click delay</td>
-                        <td style="text-align:right;padding-left:24px;">${results.avgClick} ms</td></tr>
-                    <tr><td style="text-align:left;">Total session</td>
-                        <td style="text-align:right;padding-left:24px;">${(results.totalSessionTime/1000).toFixed(2)} s</td></tr>
-                </table>
-                <div style="max-height:300px; overflow-y:auto;">
-                    <table class="results-table" style="margin:0 auto;">
-                        <tr><th>#</th><th>Hover</th><th>Click</th><th>Total</th><th>Miss</th><th>False</th></tr>
-                        ${rows}
-                    </table>
-                </div>
-                <div style="margin-top:16px; display:flex; gap:10px; justify-content:center;">
-                    <button onclick="window.popupTargets.startGame()">Restart</button>
-                    <button onclick="returnToMenu()">Back to Menu</button>
-                </div>
-            </div>
-        `;
+        container.innerHTML = window.renderResultScreen({
+            drillName: 'Pop-up Targets',
+            official: results.official,
+            primary: {
+                label: 'Average total time',
+                value: `${results.avgTotal} ms`,
+                hint: 'Target appearance to click',
+                color: '#2ec4b6'
+            },
+            metrics: [
+                { label: 'Avg hover', value: formatMs(results.avgHover) },
+                { label: 'Avg click delay', value: formatMs(results.avgClick) },
+                { label: 'Total session', value: `${(results.totalSessionTime / 1000).toFixed(2)} s` },
+                { label: 'Misses', value: totalMisses, tone: totalMisses ? 'warning' : 'success' },
+                { label: 'False hits', value: totalFalseHits, tone: totalFalseHits ? 'danger' : 'success' }
+            ],
+            breakdown: {
+                title: 'Target breakdown',
+                headers: ['Target', 'Hover', 'Click', 'Total', 'Misses', 'False hits'],
+                rows,
+                note: 'Hover and click are component timings; total is measured directly from appearance to click.'
+            },
+            restartAction: 'window.popupTargets.startGame()',
+            backAction: 'returnToMenu()'
+        });
     },
 
     showPopupMessage: function(text) {
@@ -449,47 +476,22 @@ window.popupTargets = {
         setTimeout(()=>msg.remove(), 1500);
     },
 
-    showTemporaryMessage: function(text, color = "#ff4d4d") {
-        const host = document.getElementById('game-container');
-        if (!host) return;
-        
-         // center overlay correctly
-        const computedPos = getComputedStyle(host).position;
-        if (computedPos === 'static' || !computedPos) {
-            host.style.position = 'relative';
-        }
-
-        const msg = document.createElement('div');
-        msg.textContent = text;
-        msg.style.cssText = `
-            position:absolute;
-            top:50%;left:50%;
-            transform:translate(-50%,-50%);
-            background:rgba(0,0,0,0.6);
-            color:${color};
-            padding:6px 12px;
-            border-radius:6px;
-            font-weight:bold;
-            z-index:1000;
-            font-size:1.2em;
-            pointer-events:none;
-            backdrop-filter:saturate(120%) blur(0.5px);
-        `;
-        host.appendChild(msg);
-
-        setTimeout(() => {
-            msg.style.transition = "opacity 0.4s";
-            msg.style.opacity = "0";
-            setTimeout(() => msg.remove(), 400);
-        }, 1000);
+    showTemporaryMessage: function(text, type = "error") {
+        window.showGameFeedback({
+            type,
+            message: text,
+            duration: 480,
+            pulseTarget: '#popup-area'
+        });
     },
 
     returnToMenu: function() {
         this.gameActive = false;
+        this.targetReady = false;
 
         const area = document.getElementById('popup-area');
         if (area && area.parentNode) {
-            const fresh = area.cloneNode(true);    // drop all listeners
+            const fresh = area.cloneNode(true);    // Remove all event listeners from the arena.
             area.parentNode.replaceChild(fresh, area);
         }
 
@@ -500,3 +502,5 @@ window.popupTargets = {
     }
 
 };
+
+
